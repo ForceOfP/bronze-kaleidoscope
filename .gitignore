@@ -6,5 +6,7 @@ CMakeFiles
 build
 .cache
 Testing
+CMakeCache.txt
 
 kalei
+ut_test

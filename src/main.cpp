@@ -1,4 +1,4 @@
-#include "src/ast/lexer.hpp"
+#include "ast/lexer.hpp"
 
 namespace {
     using namespace std;
@@ -6,7 +6,7 @@ namespace {
 
 enum class Stage {Tokens};
 
-void main_loop(Stage stage) {
+void driver(Stage stage) {
     string input;
     for (;;) {
         cout << "> ";
@@ -31,6 +31,6 @@ void main_loop(Stage stage) {
 }
 
 int main(int, char**) {
-    main_loop(Stage::Tokens);
+    driver(Stage::Tokens);
     return 0;
 }
