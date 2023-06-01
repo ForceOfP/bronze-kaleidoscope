@@ -1,0 +1,13 @@
+Language: Cpp
+IndentWidth: 4
+DerivePointerAlignment: false
+PointerAlignment: Left
+AccessModifierOffset:	-4
+AlignAfterOpenBracket:	Align
+AllowShortIfStatementsOnASingleLine: true
+AllowShortLoopsOnASingleLine:	true
+
+IndentCaseLabels: false
+TabWidth:	4
+UseTab:	Never
+BreakBeforeBraces: Attach

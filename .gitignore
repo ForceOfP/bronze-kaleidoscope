@@ -1,0 +1,10 @@
+*.cmake
+*.tcl
+*.a
+Makefile
+CMakeFiles
+build
+.cache
+Testing
+
+kalei
