@@ -31,25 +31,25 @@ public:
     friend std::ostream& operator<<(std::ostream& os, const Token& t) {
         switch (t.type_) {
         case TokenType::Eof:
-            os << "[Eof] "; break;
+            os << "[Eof]"; break;
         case TokenType::Def:
-            os << "[Def] "; break;
+            os << "[Def]"; break;
         case TokenType::Extern:
-            os << "[Extern] "; break;
+            os << "[Extern]"; break;
         case TokenType::Delimiter:
-            os << "[;] "; break;
+            os << "[;]"; break;
         case TokenType::LeftParenthesis:
-            os << "[(] "; break;
+            os << "[(]"; break;
         case TokenType::RightParenthesis:
-            os << "[)] "; break;
+            os << "[)]"; break;
         case TokenType::Comma:
-            os << "[,] "; break;
+            os << "[,]"; break;
         case TokenType::Identifier:
-            os << "[" << t.get_string() << "] "; break;
+            os << "[Ident: " << t.get_string() << "]"; break;
         case TokenType::Literal:
-            os << "[" << t.get_literal() << "] "; break;
+            os << "[Literal: " << t.get_literal() << "]"; break;
         case TokenType::Operator:
-            os << "[" << t.get_string() << "] "; break;
+            os << "[Oper: " << t.get_string() << "]"; break;
         case TokenType::Init:
             break;
         }

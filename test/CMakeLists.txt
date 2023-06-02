@@ -1,6 +1,7 @@
 enable_testing()
 
 include_directories(ast)
+include_directories(${kalei_SOURCE_DIR}/src)
 
 aux_source_directory(ast AST_TEST_DIR)
 set(
