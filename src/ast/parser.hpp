@@ -1,36 +1,47 @@
-/* #pragma once
+#pragma once
 
+#include <algorithm>
+#include <cassert>
+#include <iterator>
 #include <map>
+#include <exception>
+#include <optional>
+#include <functional>
+#include <string>
+#include <vector>
 
 #include "ast.hpp"
-#include "lexer.hpp"
+#include "token.hpp"
 
 class Parser {
 public:
-    Token get_next_token();
-    std::unique_ptr<ExprAST> parse_expression();
-    std::unique_ptr<ExprAST> parse_number_expr();
-    std::unique_ptr<ExprAST> parse_paren_expr();
-    std::unique_ptr<ExprAST> parse_identifier_expr();
-    std::unique_ptr<ExprAST> parse_primary();
-    std::unique_ptr<ExprAST> parse_binary_operator_rhs();
-    std::unique_ptr<ExprAST> parse_prototype();
-    std::unique_ptr<ExprAST> parse_definition();
-    std::unique_ptr<ExprAST> parse_top_level_expr();
-    std::unique_ptr<ExprAST> parse_extern();
+    explicit Parser(std::vector<Token>&& v): tokens_(std::move(v)) {
+        token_iter_ = tokens_.begin();
+    }
+
+    std::vector<ASTNodePtr> parse();
+    void parse_top_level_expression();
+    void parse_definition();
+    void parse_extern();
+
+    ExpressionPtr parse_expression();
+    ProtoTypePtr parse_prototype();
+
+    ExpressionPtr parse_binary_op_rhs(int prec, ExpressionPtr lhs);
+    ExpressionPtr parse_primary();
+
+    ExpressionPtr parse_identifier_expr();
+    ExpressionPtr parse_literal_expr();
+    ExpressionPtr parse_parenthesis_expr();
 private:
-    Token current_;
-    std::map<std::string, int> operator_precedence_;
-
+    TokenType current_token_type() { return token_iter_->type_; }
+    void next_token() { token_iter_++; }
+    int current_token_precedence();
+private:
+    using TokenVecIter = std::vector<Token>::iterator;
+    std::vector<Token> tokens_;
+    std::vector<ASTNodePtr> ast_tree_;
+    TokenVecIter token_iter_;
+    std::string err_;
+    std::map<std::string, int> operator_precedence_ = {{"<", 10}, {"+", 20}, {"-", 20}, {"*", 40}};
 };
-
-/// LogError* - These are little helper functions for error handling.
-std::unique_ptr<ExprAST> LogError(const char *Str) {
-    fprintf(stderr, "Error: %s\n", Str);
-    return nullptr;
-}
-
-std::unique_ptr<PrototypeAST> LogErrorP(const char *Str) {
-    LogError(Str);
-    return nullptr;
-} */

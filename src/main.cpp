@@ -1,10 +1,12 @@
 #include "ast/lexer.hpp"
+#include "ast/parser.hpp"
+#include "ast/token.hpp"
 
 namespace {
     using namespace std;
 }
 
-enum class Stage {Tokens};
+enum class Stage {Tokens, Parser};
 
 void driver(Stage stage) {
     string input;
@@ -18,19 +20,24 @@ void driver(Stage stage) {
         }
 
         for (;;) {
-            auto ans = Lexer::tokenize(input);
+            auto tokens = Lexer::tokenize(input);
             if (stage == Stage::Tokens) {
-                for (const auto& token: ans) {
+                for (const auto& token: tokens) {
                     cout << token << ' ';
                 }
                 cout << endl;
                 break;
-            }
+            } 
+            tokens.emplace_back(TokenType::Eof);
+            auto parser = Parser(std::move(tokens));
+            
+            parser.parse();
+            break;
         }
     }
 }
 
 int main(int, char**) {
-    driver(Stage::Tokens);
+    driver(Stage::Parser);
     return 0;
 }

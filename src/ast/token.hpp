@@ -4,6 +4,8 @@
 #include <any>
 #include <cassert>
 #include <iostream>
+#include <memory>
+#include <vector>
 
 enum class TokenType {
     Eof,
@@ -23,7 +25,8 @@ class Token {
 public:
     Token(TokenType t, std::string v): type_(t), value_(v) {}
     Token(TokenType t, double v): type_(t), value_(v) {}
-    Token(TokenType t): type_(t) {}
+    explicit Token(TokenType t): type_(t) {}
+    Token() = default;
 
     [[nodiscard]] std::string get_string() const;
     [[nodiscard]] double get_literal() const;
@@ -60,3 +63,5 @@ public:
     std::any value_;
 };
 
+using TokenPtr = std::unique_ptr<Token>;
+using TokenPtrVec = std::vector<TokenPtr>;

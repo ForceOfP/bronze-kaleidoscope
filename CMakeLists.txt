@@ -8,6 +8,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 add_subdirectory(src)
 add_subdirectory(src/ast)
+add_subdirectory(src/utils)
 
 enable_testing()
 add_subdirectory(test)
