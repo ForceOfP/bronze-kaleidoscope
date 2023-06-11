@@ -37,7 +37,8 @@ std::vector<ASTNodePtr> Parser::parse() {
 
     return std::move(ast_tree_);
 }
- 
+
+/// top_level_expression ::= expression
 void Parser::parse_top_level_expression() {
     auto expression = parse_expression();
     if (!expression) {
@@ -51,6 +52,7 @@ void Parser::parse_top_level_expression() {
     ast_tree_.push_back(std::make_unique<ASTNode>(FunctionNode{std::move(proto), std::move(expression)}));
 }
 
+/// definition ::= 'def' prototype expression
 void Parser::parse_definition() {
     next_token(); //eat def
     auto proto = parse_prototype();
@@ -68,6 +70,7 @@ void Parser::parse_definition() {
     ast_tree_.push_back(std::make_unique<ASTNode>(FunctionNode{std::move(proto), std::move(expression)}));
 }
 
+/// external ::= 'extern' prototype
 void Parser::parse_extern() {
     next_token(); // eat extern
     auto proto = parse_prototype();
@@ -77,6 +80,7 @@ void Parser::parse_extern() {
     ast_tree_.push_back(std::make_unique<ASTNode>(ExternNode{std::move(proto)}));
 }
 
+/// expression ::= primary binoprhs
 ExpressionPtr Parser::parse_expression() {
     auto lhs = parse_primary();
     if (!lhs) {
@@ -86,6 +90,8 @@ ExpressionPtr Parser::parse_expression() {
     return parse_binary_op_rhs(0, std::move(lhs));
 }
 
+/// prototype ::= id '(' id* ')' 
+/// id in parenthesis are splited by ','
 ProtoTypePtr Parser::parse_prototype() {
     if (current_token_type() != TokenType::Identifier) {
         err_ = "Expected function name in prototype";
@@ -128,6 +134,7 @@ ProtoTypePtr Parser::parse_prototype() {
     return std::make_unique<ProtoType>(name, args);
 }
 
+/// binoprhs::= [operator primary]*
 ExpressionPtr Parser::parse_binary_op_rhs(int prec, ExpressionPtr lhs) {
     for (;;) {
         int current_prec = current_token_precedence();
@@ -165,6 +172,7 @@ ExpressionPtr Parser::parse_binary_op_rhs(int prec, ExpressionPtr lhs) {
     }
 }
 
+/// primary ::= identifierexpr | numberexpr | parenexpr
 ExpressionPtr Parser::parse_primary() {
     switch (current_token_type()) {
     case TokenType::LeftParenthesis:
@@ -179,6 +187,8 @@ ExpressionPtr Parser::parse_primary() {
     }
 }
 
+/// identifierexpr ::= identifier ['(' expression* ')']+
+/// expression in parenthesis are splited by ','
 ExpressionPtr Parser::parse_identifier_expr() {
     std::string name = (*token_iter_).get_string();
     next_token(); // eat name
@@ -215,12 +225,14 @@ ExpressionPtr Parser::parse_identifier_expr() {
     return std::make_unique<CallExpr>(name, std::move(args));
 }
 
+/// literalexpr ::= literal
 ExpressionPtr Parser::parse_literal_expr() {
     auto res = std::make_unique<LiteralExpr>((*token_iter_).get_literal());
     next_token();
     return res;
 }
 
+/// parenexpr ::= '(' expression ')'
 ExpressionPtr Parser::parse_parenthesis_expr() {
     next_token(); // eat '('
     auto res = parse_expression();
