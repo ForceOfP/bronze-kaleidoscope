@@ -31,7 +31,10 @@ void driver(Stage stage) {
             tokens.emplace_back(TokenType::Eof);
             auto parser = Parser(std::move(tokens));
             
-            parser.parse();
+            auto asts = parser.parse();
+            for (auto& ast: asts) {
+                cout << *ast << endl;
+            }
             break;
         }
     }

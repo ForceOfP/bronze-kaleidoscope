@@ -1,4 +1,5 @@
 #include "lexer.hpp"
+#include "ast/token.hpp"
 #include <iostream>
 
 #include <re2/re2.h>
@@ -69,6 +70,8 @@ std::vector<Token> Lexer::tokenize(std::string target_) {
             start++;
         }        
     }
+
+    ans.emplace_back(TokenType::Eof);
     
     return ans;
 }

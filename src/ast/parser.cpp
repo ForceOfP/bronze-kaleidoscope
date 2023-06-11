@@ -45,10 +45,9 @@ void Parser::parse_top_level_expression() {
         return;
     }
 
-    std::cout << "Parsed a top-level expr." << std::endl;
+    // std::cout << "Parsed a top-level expr." << std::endl;
     
     auto proto = std::make_unique<ProtoType>("__anon_expr", std::vector<std::string>());
-    auto function = FunctionNode{std::move(proto), std::move(expression)};
     ast_tree_.push_back(std::make_unique<ASTNode>(FunctionNode{std::move(proto), std::move(expression)}));
 }
 
@@ -65,7 +64,7 @@ void Parser::parse_definition() {
         return;
     }
 
-    std::cout << "Parsed a function definition." << std::endl;
+    // std::cout << "Parsed a function definition." << std::endl;
 
     ast_tree_.push_back(std::make_unique<ASTNode>(FunctionNode{std::move(proto), std::move(expression)}));
 }
@@ -75,7 +74,7 @@ void Parser::parse_extern() {
     next_token(); // eat extern
     auto proto = parse_prototype();
 
-    std::cout << "Parsed an extern." << std::endl;
+    // std::cout << "Parsed an extern." << std::endl;
 
     ast_tree_.push_back(std::make_unique<ASTNode>(ExternNode{std::move(proto)}));
 }

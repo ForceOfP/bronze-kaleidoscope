@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <ostream>
 #include <string>
 #include <utility>
 #include <vector>
@@ -45,24 +46,6 @@ struct CallExpr: public Expression {
         callee(std::move(_callee)), args(std::move(_args)) {}
 };
 
-/* struct Expression {
-    std::variant<VariableExpr, BinaryExpr, CallExpr, LiteralExpr> data;
-    explicit Expression(VariableExpr&& v): data(std::move(v)) {}
-    explicit Expression(BinaryExpr&& b): data(std::move(b)) {}
-    explicit Expression(CallExpr&& c): data(std::move(c)) {}
-    explicit Expression(LiteralExpr&& l): data(l) {}
-
-    template<typename VariableVisitor, typename BinaryVisitor, typename CallVisitor, typename LiteralVisitor>
-    auto match(
-        VariableVisitor variable_visitor, 
-        BinaryVisitor binary_visitor,
-        CallVisitor call_visitor,
-        LiteralVisitor literal_visitor
-    ) {
-        return std::visit(overloaded{variable_visitor, binary_visitor, call_visitor, literal_visitor}, data);
-    }
-}; */
-
 struct ProtoType {
     std::string name;
     std::vector<std::string> args;
@@ -71,12 +54,16 @@ struct ProtoType {
         name(std::move(_name)), args(std::move(_args)) {}
 
     ProtoType(): name(""), args({}) {}
+
+    friend std::ostream& operator<<(std::ostream& os, const ProtoType& t);
 };
 
 struct ExternNode {
     std::unique_ptr<ProtoType> prototype;
     
     explicit ExternNode(std::unique_ptr<ProtoType> _prototype): prototype(std::move(_prototype)) {}
+
+    friend std::ostream& operator<<(std::ostream& os, const ExternNode& t);
 };
 
 struct FunctionNode {
@@ -85,6 +72,8 @@ struct FunctionNode {
 
     FunctionNode(std::unique_ptr<ProtoType> _prototype, std::unique_ptr<Expression> _body):
         prototype(std::move(_prototype)), body(std::move(_body)) {}
+
+    friend std::ostream& operator<<(std::ostream& os, const FunctionNode& t);
 };
 
 struct ASTNode {
@@ -96,6 +85,8 @@ struct ASTNode {
     auto match(ExternVisitor extern_visitor, FunctionVisitor function_visitor) {
         return std::visit(overloaded{extern_visitor, function_visitor}, data);
     }
+
+    friend std::ostream& operator<<(std::ostream& os, ASTNode& t);
 };
 
 using ASTNodePtr = std::unique_ptr<ASTNode>;

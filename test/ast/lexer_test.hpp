@@ -1,12 +1,17 @@
+#pragma once
+
 #include <gtest/gtest.h>
 #include "ast/lexer.hpp"
+#include "ast/token.hpp"
 
-std::string serialize_tokens (std::vector<Token>& tokens) {
+std::string serialize_tokens(std::vector<Token>& tokens) {
     std::stringstream ss;
 
+    tokens.pop_back();
     for (const auto& token: tokens) {
         ss << token << ' ';
     }
+    tokens.emplace_back(TokenType::Eof);
 
     std::string ans = ss.str();
     ans.pop_back();
