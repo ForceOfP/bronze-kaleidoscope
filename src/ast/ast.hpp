@@ -16,13 +16,11 @@ public:
 
 struct LiteralExpr: public Expression {
     double value;
-public:
     explicit LiteralExpr(double d): value(d) {}
 };
 
 struct VariableExpr: public Expression {
     std::string name;
-public:
     explicit VariableExpr(std::string str): name(std::move(str)) {}
 };
 
@@ -30,7 +28,6 @@ struct BinaryExpr: public Expression {
     std::string oper;
     std::unique_ptr<Expression> lhs;
     std::unique_ptr<Expression> rhs;
-public:
     BinaryExpr(
         std::string op,
         std::unique_ptr<Expression> LHS,
@@ -91,5 +88,6 @@ struct ASTNode {
 
 using ASTNodePtr = std::unique_ptr<ASTNode>;
 using FunctionNodePtr = std::unique_ptr<FunctionNode>;
+using ExternNodePtr = std::unique_ptr<ExternNode>;
 using ProtoTypePtr = std::unique_ptr<ProtoType>;
 using ExpressionPtr = std::unique_ptr<Expression>;

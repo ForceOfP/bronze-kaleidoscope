@@ -29,6 +29,7 @@ std::ostream& operator<<(std::ostream& os, const ProtoType& t) {
         for (auto& arg: t.args) {
             os << arg << ' ';
         }
-        return os;
     }
+    return os;
 }
+

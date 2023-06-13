@@ -1,12 +1,13 @@
 #include "ast/lexer.hpp"
 #include "ast/parser.hpp"
 #include "ast/token.hpp"
+#include "codegen/codegen.hpp"
 
 namespace {
     using namespace std;
 }
 
-enum class Stage {Tokens, Parser};
+enum class Stage {Tokens, Parser, Codegen};
 
 void driver(Stage stage) {
     string input;
@@ -29,18 +30,24 @@ void driver(Stage stage) {
                 break;
             } 
             tokens.emplace_back(TokenType::Eof);
+
             auto parser = Parser(std::move(tokens));
-            
             auto asts = parser.parse();
-            for (auto& ast: asts) {
-                cout << *ast << endl;
+            if (stage == Stage::Parser) {
+                for (auto& ast: asts) {
+                    cout << *ast << endl;
+                }
             }
+
+            auto generator = CodeGenerator(std::move(asts));
+            generator.codegen();
+
             break;
         }
     }
 }
 
 int main(int, char**) {
-    driver(Stage::Parser);
+    driver(Stage::Codegen);
     return 0;
 }
