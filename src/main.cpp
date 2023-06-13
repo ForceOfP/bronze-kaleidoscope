@@ -2,6 +2,7 @@
 #include "ast/parser.hpp"
 #include "ast/token.hpp"
 #include "codegen/codegen.hpp"
+#include <llvm-15/llvm/Support/raw_ostream.h>
 
 namespace {
     using namespace std;
@@ -40,7 +41,7 @@ void driver(Stage stage) {
             }
 
             auto generator = CodeGenerator(std::move(asts));
-            generator.codegen();
+            generator.codegen(llvm::errs());
 
             break;
         }

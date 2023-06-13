@@ -162,20 +162,20 @@ llvm::Function* CodeGenerator::codegen(FunctionNode& f) {
     return nullptr;
 }
 
-void CodeGenerator::codegen() {
+void CodeGenerator::codegen(llvm::raw_ostream& output_stream) {
     for (auto& ast: ast_tree_) {
         ast->match(
             [&](FunctionNode& f) {
                 bool flag = f.prototype->name == "__anon_expr";
 
                 if (auto ir = codegen(f)) {
-                    ir->print(llvm::errs());
+                    ir->print(output_stream);
                     if (flag) ir->removeFromParent();
                 }
             }, 
             [&](ExternNode& e) {
                 if (auto ir = codegen(std::move(e.prototype))) {
-                    ir->print(llvm::errs());
+                    ir->print(output_stream);
                 }
             }  
         );

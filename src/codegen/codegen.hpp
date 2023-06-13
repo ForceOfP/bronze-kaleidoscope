@@ -23,7 +23,7 @@ public:
     llvm::Function* codegen(ProtoTypePtr p);
     llvm::Function* codegen(FunctionNode& f);
 
-    void codegen();
+    void codegen(llvm::raw_ostream& output_stream);
 private:
     std::unique_ptr<llvm::LLVMContext> context_;
     std::unique_ptr<llvm::IRBuilder<>> builder_;
