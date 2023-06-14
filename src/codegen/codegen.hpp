@@ -1,6 +1,8 @@
 #pragma once
 
-#include "ast/ast.hpp"
+#include <llvm-15/llvm/IR/Function.h>
+#include <llvm/Support/Error.h>
+#include <llvm/IR/LegacyPassManager.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
@@ -10,9 +12,12 @@
 #include <memory>
 #include <string>
 
+#include "ast/ast.hpp"
+#include "jit_engine.hpp"
+
 class CodeGenerator {
 public:
-    explicit CodeGenerator(std::vector<ASTNodePtr>&&);
+    explicit CodeGenerator(llvm::raw_ostream&);
 
     llvm::Value* codegen(std::unique_ptr<CallExpr> e);
     llvm::Value* codegen(std::unique_ptr<BinaryExpr> e);
@@ -23,12 +28,20 @@ public:
     llvm::Function* codegen(ProtoTypePtr p);
     llvm::Function* codegen(FunctionNode& f);
 
-    void codegen(llvm::raw_ostream& output_stream);
+    void codegen(std::vector<ASTNodePtr>&&);
+private:
+    void initialize_llvm_elements();
+    llvm::Function* get_function(std::string name);
 private:
     std::unique_ptr<llvm::LLVMContext> context_;
     std::unique_ptr<llvm::IRBuilder<>> builder_;
     std::unique_ptr<llvm::Module> module_;
+    std::unique_ptr<llvm::legacy::FunctionPassManager> function_pass_manager_;
+    std::unique_ptr<OrcJitEngine> jit_;
+
     std::map<std::string, llvm::Value*> named_values_;
+    std::map<std::string, ProtoType> function_protos_ = {};
     std::string err_;
-    std::vector<ASTNodePtr> ast_tree_;
+    llvm::ExitOnError exit_on_error_;
+    llvm::raw_ostream& output_stream_;
 };

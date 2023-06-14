@@ -4,6 +4,10 @@
 #include "codegen/codegen_test.hpp"
 
 int main() {
+    LLVMInitializeNativeTarget();
+    LLVMInitializeNativeAsmPrinter();
+    LLVMInitializeNativeAsmParser();
+
     ::testing::InitGoogleTest();
     return RUN_ALL_TESTS();
 }

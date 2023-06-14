@@ -29,12 +29,14 @@ TEST(CODEGEN, codegen) {
     };
 
     assert(target.size() == answer.size());
+    std::string ans = "";
+    llvm::raw_string_ostream output(ans); 
+    auto generator = CodeGenerator(output);
     for (int i = 0; i < target.size(); i++) {
         auto parser = Parser(Lexer::tokenize(target[i]));
-        auto generator = CodeGenerator(parser.parse());
-        std::string ans = "";
-        llvm::raw_string_ostream output(ans);
-        generator.codegen(output);
+        auto asts = parser.parse();
+        generator.codegen(std::move(asts));
         ASSERT_EQ(ans, answer[i]);
+        ans.clear();
     }
 }

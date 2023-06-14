@@ -2,7 +2,7 @@
 #include "ast/parser.hpp"
 #include "ast/token.hpp"
 #include "codegen/codegen.hpp"
-#include <llvm-15/llvm/Support/raw_ostream.h>
+#include <llvm/Support/raw_ostream.h>
 
 namespace {
     using namespace std;
@@ -12,8 +12,9 @@ enum class Stage {Tokens, Parser, Codegen};
 
 void driver(Stage stage) {
     string input;
+    auto generator = CodeGenerator(llvm::errs()); 
     for (;;) {
-        cout << "> ";
+        cout << "ready> ";
         cout.flush();
         input.clear();
         getline(cin, input);
@@ -40,8 +41,7 @@ void driver(Stage stage) {
                 }
             }
 
-            auto generator = CodeGenerator(std::move(asts));
-            generator.codegen(llvm::errs());
+            generator.codegen(std::move(asts));
 
             break;
         }
@@ -49,6 +49,10 @@ void driver(Stage stage) {
 }
 
 int main(int, char**) {
+    LLVMInitializeNativeTarget();
+    LLVMInitializeNativeAsmPrinter();
+    LLVMInitializeNativeAsmParser();
+
     driver(Stage::Codegen);
     return 0;
 }

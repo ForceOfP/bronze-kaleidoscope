@@ -160,8 +160,8 @@ ExpressionPtr Parser::parse_binary_op_rhs(int prec, ExpressionPtr lhs) {
         // If BinOp binds less tightly with RHS than the operator after RHS, let
         // the pending operator take RHS as its LHS.
         int next_prec = current_token_precedence();
-        if (prec < next_prec) {
-            rhs = parse_binary_op_rhs(prec + 1, std::move(rhs));
+        if (current_prec < next_prec) {
+            rhs = parse_binary_op_rhs(current_prec + 1, std::move(rhs));
             if (!rhs) {
                 return nullptr;
             }
