@@ -27,6 +27,7 @@ TEST(AST, tokenize) {
         ";,()+-*=",
         "extern",
         "def f(x) x + x ###afeabgnan####",
+        "for in if else then",
     };
     std::vector<std::string> answer = {
         "[Def] [Ident: f] [(] [Ident: x] [)] [Ident: x] [Oper: +] [Ident: x]",
@@ -36,6 +37,7 @@ TEST(AST, tokenize) {
         "[;] [,] [(] [)] [Oper: +] [Oper: -] [Oper: *] [Oper: =]",
         "[Extern]",
         "[Def] [Ident: f] [(] [Ident: x] [)] [Ident: x] [Oper: +] [Ident: x]",
+        "[For] [In] [If] [Else] [Then]"
     };
 
     assert(target.size() == answer.size());

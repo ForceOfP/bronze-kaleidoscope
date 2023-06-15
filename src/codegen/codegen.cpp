@@ -19,6 +19,7 @@
 #include <llvm/Support/raw_ostream.h>
 
 #include <memory>
+#include <string>
 #include <utility>
 #include <vector>
 #include <cassert>
@@ -45,7 +46,7 @@ void CodeGenerator::initialize_llvm_elements() {
 CodeGenerator::CodeGenerator(llvm::raw_ostream& os): output_stream_(os) {
     exit_on_error_ = llvm::ExitOnError();
     jit_ = exit_on_error_(OrcJitEngine::create());
-    
+
     initialize_llvm_elements();
 }
 
@@ -367,7 +368,8 @@ void CodeGenerator::codegen(std::vector<ASTNodePtr>&& ast_tree) {
                         auto expr_symbol = exit_on_error_(jit_->lookup("__anon_expr"));
                         auto address = expr_symbol.getAddress();
                         auto fp = llvm::jitTargetAddressToPointer<double (*)()>(address);
-                        output_stream_ << fp() << '\n';
+                        
+                        output_stream_ << std::to_string(fp()) << '\n';
                         exit_on_error_(rt->remove());
                     } else {
                         output_stream_ << err_ << '\n';
@@ -388,7 +390,7 @@ void CodeGenerator::codegen(std::vector<ASTNodePtr>&& ast_tree) {
     }
 }
 
-llvm::Function* CodeGenerator::get_function(std::string name) {
+llvm::Function* CodeGenerator::get_function(std::string& name) {
     if (auto f = module_->getFunction(name)) {
         return f;
     }

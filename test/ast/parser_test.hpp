@@ -18,16 +18,22 @@ std::string serialize_asts(std::vector<ASTNodePtr>& asts) {
 }
 
 TEST(AST, parse) {
-    std::vector<std::string> target = {
+    const std::vector<std::string> target = {
         "def f(x) x + x",
         "2.3",
         "extern sin(x)",
+        "if 1 then 2 else 3;",
+        "for i = 0, i < n, 1.0 in 1;",
+        "for i = 0, i < n in 1;"
     };
 
-    std::vector<std::string> answer = {
+    const std::vector<std::string> answer = {
         "[Function]: \n\t[Name]: f\n\t[Args]: x ",
         "[Function]: \n\t[Name]: __anon_expr\n",
-        "[Extern]: \n\t[Name]: sin\n\t[Args]: x "
+        "[Extern]: \n\t[Name]: sin\n\t[Args]: x ",
+        "[Function]: \n\t[Name]: __anon_expr\n",
+        "[Function]: \n\t[Name]: __anon_expr\n",
+        "[Function]: \n\t[Name]: __anon_expr\n"
     };
 
     assert(target.size() == answer.size());

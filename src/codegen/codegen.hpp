@@ -32,7 +32,7 @@ public:
     void codegen(std::vector<ASTNodePtr>&&);
 private:
     void initialize_llvm_elements();
-    llvm::Function* get_function(std::string name);
+    llvm::Function* get_function(std::string& name);
 private:
     std::unique_ptr<llvm::LLVMContext> context_;
     std::unique_ptr<llvm::IRBuilder<>> builder_;

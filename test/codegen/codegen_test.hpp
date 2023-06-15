@@ -36,7 +36,7 @@ TEST(CODEGEN, single) {
         "  ret double \%addtmp\n"
         "}\n",
         "declare double @sin(double)\n",
-        "5.000000e+00\n"
+        "5.000000\n"
     };
 
     assert(target.size() == answer.size());
@@ -88,8 +88,8 @@ TEST(CODEGEN, jit) {
         "  \%addtmp = fadd double \%multmp, \%z\n"
         "  ret double \%addtmp\n"
         "}\n",
-        "1.100000e+01\n",
-        "5.000000e+00\n"
+        "11.000000\n",
+        "5.000000\n"
     };
 
     assert(target.size() == answer.size());
@@ -120,8 +120,86 @@ TEST(CODEGEN, ext) {
         "  \%addtmp = fadd double \%multmp, \%multmp4\n"
         "  ret double \%addtmp\n"
         "}\n",
-        "1.000000e+00\n",
-        "1.000000e+00\n"
+        "1.000000\n",
+        "1.000000\n"
+    };
+
+    assert(target.size() == answer.size());
+    codegen_helper(target, answer);
+}
+
+TEST(CODEGEN, ifelse) {
+    std::vector<std::string> target = {
+        "def double(x) x + x",
+        "def triple(x) x * 3",
+        "def f(x) if x < 3 then double(x) else triple(x);",
+        "f(2)",
+        "f(5)"
+    };
+
+    std::vector<std::string> answer = {
+        "define double @double(double \%x) {\n"
+        "entry:\n"
+        "  \%addtmp = fadd double \%x, \%x\n"
+        "  ret double \%addtmp\n"
+        "}\n",
+        "define double @triple(double \%x) {\n"
+        "entry:\n"
+        "  \%multmp = fmul double \%x, 3.000000e+00\n"
+        "  ret double \%multmp\n"
+        "}\n",
+        "define double @f(double \%x) {\n"
+        "entry:\n"
+        "  \%0 = fcmp ult double \%x, 3.000000e+00\n"
+        "  br i1 \%0, label \%then, label \%else\n"
+        "\n"
+        "then:                                             ; preds = \%entry\n"
+        "  \%calltmp = call double @double(double \%x)\n"
+        "  br label \%ifcont\n"
+        "\n"
+        "else:                                             ; preds = \%entry\n"
+        "  \%calltmp1 = call double @triple(double \%x)\n"
+        "  br label \%ifcont\n"
+        "\n"
+        "ifcont:                                           ; preds = \%else, \%then\n"
+        "  \%iftmp = phi double [ \%calltmp, \%then ], [ \%calltmp1, \%else ]\n"
+        "  ret double \%iftmp\n"
+        "}\n",
+        "4.000000\n",
+        "15.000000\n"
+    };
+
+    assert(target.size() == answer.size());
+    codegen_helper(target, answer);
+}
+
+TEST(CODEGEN, loop) {
+    std::vector<std::string> target = {
+        "extern putchard(char)",
+        "def printstar(n) for i = 0, i < n, 1.0 in putchard(42);",
+        "printstar(20)",
+        "printstar(30)"
+    };
+
+    std::vector<std::string> answer = {
+        "declare double @putchard(double)\n",
+        "define double @printstar(double \%n) {\n"
+        "entry:\n"
+        "  br label \%loop\n"
+        "\n"
+        "loop:                                             ; preds = \%loop, \%entry\n"
+        "  \%i = phi double [ 0.000000e+00, \%entry ], [ \%nextvar, \%loop ]\n"
+        "  \%calltmp = call double @putchard(double 4.200000e+01)\n"
+        "  \%nextvar = fadd double \%i, 1.000000e+00\n"
+        "  \%0 = fcmp ult double \%i, \%n\n"
+        "  br i1 \%0, label \%loop, label \%afterloop\n"
+        "\n"
+        "afterloop:                                        ; preds = \%loop\n"
+        "  ret double 0.000000e+00\n"
+        "}\n",
+        // TODO(lbt): this example should be updated.
+        "0.000000\n",
+        "0.000000\n"
     };
 
     assert(target.size() == answer.size());
