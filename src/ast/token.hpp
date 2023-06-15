@@ -18,6 +18,11 @@ enum class TokenType {
     Identifier, // with a string
     Literal, // with a double
     Operator, // with a string
+    If,
+    Else,
+    Then,
+    For,
+    In,
     Init
 };
 
@@ -54,6 +59,18 @@ public:
         case TokenType::Operator:
             os << "[Oper: " << t.get_string() << "]"; break;
         case TokenType::Init:
+            break;
+        case TokenType::If:
+            os << "[If]"; break;
+        case TokenType::Else:
+            os << "[Else]"; break;
+        case TokenType::Then:
+            os << "[Then]"; break;
+        case TokenType::For:
+            os << "[For]"; break;
+        case TokenType::In:
+            os << "[In]"; break;
+        default:
             break;
         }
         return os;

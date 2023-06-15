@@ -30,6 +30,8 @@ public:
     ExpressionPtr parse_binary_op_rhs(int prec, ExpressionPtr lhs);
     ExpressionPtr parse_primary();
 
+    ExpressionPtr parse_if_expr();
+    ExpressionPtr parse_for_expr();
     ExpressionPtr parse_identifier_expr();
     ExpressionPtr parse_literal_expr();
     ExpressionPtr parse_parenthesis_expr();

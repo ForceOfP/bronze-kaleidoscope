@@ -44,6 +44,16 @@ std::vector<Token> Lexer::tokenize(std::string target_) {
                         ans.emplace_back(TokenType::Def);
                     } else if (token_context == "extern") {
                         ans.emplace_back(TokenType::Extern);
+                    } else if (token_context == "if") {
+                        ans.emplace_back(TokenType::If);
+                    } else if (token_context == "else") {
+                        ans.emplace_back(TokenType::Else);
+                    } else if (token_context == "then") {
+                        ans.emplace_back(TokenType::Then);
+                    } else if (token_context == "for") {
+                        ans.emplace_back(TokenType::For);
+                    } else if (token_context == "in") {
+                        ans.emplace_back(TokenType::In);
                     } else {
                         ans.emplace_back(TokenType::Identifier, std::string(token_context));
                     }

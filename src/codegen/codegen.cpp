@@ -1,6 +1,5 @@
 #include "codegen.hpp"
 
-#include <cassert>
 #include <llvm/Transforms/Scalar.h>
 #include <llvm/Transforms/Scalar/GVN.h>
 #include <llvm/IR/LegacyPassManager.h>
@@ -10,6 +9,7 @@
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
+#include <llvm/IR/Instructions.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
@@ -19,7 +19,9 @@
 #include <llvm/Support/raw_ostream.h>
 
 #include <memory>
+#include <utility>
 #include <vector>
+#include <cassert>
 
 #include "ast/ast.hpp"
 #include "codegen/jit_engine.hpp"
@@ -45,6 +47,138 @@ CodeGenerator::CodeGenerator(llvm::raw_ostream& os): output_stream_(os) {
     jit_ = exit_on_error_(OrcJitEngine::create());
     
     initialize_llvm_elements();
+}
+
+// Output for-loop as:
+//   ...
+//   start = startexpr
+//   goto loop
+// loop:
+//   variable = phi [start, loopheader], [nextvariable, loopend]
+//   ...
+//   bodyexpr
+//   ...
+// loopend:
+//   step = stepexpr
+//   nextvariable = variable + step
+//   endcond = endexpr
+//   br endcond, loop, endloop
+// outloop:
+llvm::Value* CodeGenerator::codegen(std::unique_ptr<ForExpr> e) {
+    auto start_value = codegen(std::move(e->start));
+    if (!start_value) {
+        return nullptr;
+    }
+
+    llvm::Function* function = builder_->GetInsertBlock()->getParent();
+    llvm::BasicBlock* pre_header_block = builder_->GetInsertBlock();
+    llvm::BasicBlock* loop_block = llvm::BasicBlock::Create(*context_, "loop", function);
+
+    builder_->CreateBr(loop_block);
+    builder_->SetInsertPoint(loop_block);
+    // Start the PHI node with an entry for Start.
+    llvm::PHINode* phi = builder_->CreatePHI(llvm::Type::getDoubleTy(*context_), 2, e->var_name);
+    phi->addIncoming(start_value, pre_header_block);
+
+    // Within the loop, the variable is defined equal to the PHI node.  If it
+    // shadows an existing variable, we have to restore it, so save it now.
+    llvm::Value* old = named_values_[e->var_name];
+    named_values_[e->var_name] = phi;
+
+    // Emit the body of the loop.  This, like any other expr, can change the
+    // current BB.  Note that we ignore the value computed by the body, but don't
+    // allow an error.
+    if (!codegen(std::move(e->body))) {
+        return nullptr;
+    }
+
+    llvm::Value* step_value = nullptr;
+    if (e->step) {
+        step_value = codegen(std::move(e->step));
+        if (!step_value) {
+            return nullptr;
+        }
+    } else {
+        step_value = llvm::ConstantFP::get(*context_, llvm::APFloat(1.0)); // default step is 1.0
+    }
+
+    llvm::Value* next_var = builder_->CreateFAdd(phi, step_value, "nextvar");
+    auto end_condition = codegen(std::move(e->end));
+    if (!end_condition) {
+        return nullptr;
+    }
+
+    end_condition = builder_->CreateFCmpONE(
+        end_condition, llvm::ConstantFP::get(*context_, llvm::APFloat(0.0)), "loopcond");
+    
+    llvm::BasicBlock* loop_end_block = builder_->GetInsertBlock();
+    llvm::BasicBlock* after_block = llvm::BasicBlock::Create(*context_, "afterloop", function);
+
+    builder_->CreateCondBr(end_condition, loop_block, after_block);
+    builder_->SetInsertPoint(after_block);
+
+    phi->addIncoming(next_var, loop_end_block);
+    if (old) {
+        named_values_[e->var_name] = old;
+    } else {
+        named_values_.erase(e->var_name);
+    }
+
+    // for expr always returns 0.0.
+    return llvm::Constant::getNullValue(llvm::Type::getDoubleTy(*context_));
+}
+
+llvm::Value* CodeGenerator::codegen(std::unique_ptr<IfExpr> e) {
+    auto cond_value = codegen(std::move(e->condition));
+    if (!cond_value) {
+        return nullptr;
+    }
+
+    cond_value = builder_->CreateFCmpONE(
+        cond_value, llvm::ConstantFP::get(*context_, llvm::APFloat(0.0)), "ifcond");
+    
+    llvm::Function* function = builder_->GetInsertBlock()->getParent();
+
+    llvm::BasicBlock* then_block = llvm::BasicBlock::Create(*context_, "then", function);
+    llvm::BasicBlock* else_block = llvm::BasicBlock::Create(*context_, "else");
+    llvm::BasicBlock* merge_block = llvm::BasicBlock::Create(*context_, "ifcont");
+
+    builder_->CreateCondBr(cond_value, then_block, else_block);
+    builder_->SetInsertPoint(then_block);
+
+    llvm::Value* then_value = codegen(std::move(e->then));
+    if (!then_value) {
+        return nullptr;
+    }
+
+    builder_->CreateBr(merge_block);
+    then_block = builder_->GetInsertBlock();
+
+    // llvm implement a function named Function::insert() at llvm17...
+    // but I'm using llvm15
+    auto& else_inserting_blocks = function->getBasicBlockList();
+    else_inserting_blocks.insert(function->end(), else_block);
+    
+    builder_->SetInsertPoint(else_block);
+
+    llvm::Value* else_value = codegen(std::move(e->_else));
+    if (!else_value) {
+        return nullptr;
+    } 
+
+    builder_->CreateBr(merge_block);
+    else_block = builder_->GetInsertBlock();
+
+    // like behind.
+    auto& merge_inserting_blocks = function->getBasicBlockList();
+    merge_inserting_blocks.insert(function->end(), merge_block);
+
+    builder_->SetInsertPoint(merge_block);
+    llvm::PHINode* phi = builder_->CreatePHI(llvm::Type::getDoubleTy(*context_), 2, "iftmp");
+
+    phi->addIncoming(then_value, then_block);
+    phi->addIncoming(else_value, else_block);
+    return phi;
 }
 
 llvm::Value* CodeGenerator::codegen(std::unique_ptr<CallExpr> e) {
@@ -132,6 +266,18 @@ llvm::Value* CodeGenerator::codegen(std::unique_ptr<Expression> e) {
     auto b = dynamic_cast<BinaryExpr*>(raw);
     if (b) {
         std::unique_ptr<BinaryExpr> tmp(b);
+        return codegen(std::move(tmp));
+    }
+
+    auto i = dynamic_cast<IfExpr*>(raw);
+    if (i) {
+        std::unique_ptr<IfExpr> tmp(i);
+        return codegen(std::move(tmp));        
+    }
+
+    auto f = dynamic_cast<ForExpr*>(raw);
+    if (f) {
+        std::unique_ptr<ForExpr> tmp(f);
         return codegen(std::move(tmp));
     }
 

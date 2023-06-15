@@ -18,6 +18,8 @@ class CodeGenerator {
 public:
     explicit CodeGenerator(llvm::raw_ostream&);
 
+    llvm::Value* codegen(std::unique_ptr<ForExpr> e);
+    llvm::Value* codegen(std::unique_ptr<IfExpr> e);
     llvm::Value* codegen(std::unique_ptr<CallExpr> e);
     llvm::Value* codegen(std::unique_ptr<BinaryExpr> e);
     llvm::Value* codegen(std::unique_ptr<VariableExpr> e);

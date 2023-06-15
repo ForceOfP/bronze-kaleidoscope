@@ -180,10 +180,103 @@ ExpressionPtr Parser::parse_primary() {
         return parse_identifier_expr();
     case TokenType::Literal:
         return parse_literal_expr();
+    case TokenType::If:
+        return parse_if_expr();
+    case TokenType::For:
+        return parse_for_expr();
     default:
         err_ = "unknown token when expecting an expression";
         return nullptr;
     }
+}
+
+/// forexpr ::= 'for' identifier '=' expr ',' expr (',' expr)? 'in' expression
+ExpressionPtr Parser::parse_for_expr() {
+    next_token(); // eat for
+    if (current_token_type() != TokenType::Identifier) {
+        err_ = "expected identifier after for";
+        return nullptr;
+    }
+
+    std::string variant_name = token_iter_->get_string();
+    next_token(); // eat cycle variant
+
+    if (current_token_type() != TokenType::Operator && token_iter_->get_string() != "=") {
+        err_ = "expected '=' after identifier";
+        return nullptr;
+    }
+    next_token(); // eat '='
+    auto start = parse_expression();
+    if (!start) {
+        return nullptr;
+    }
+
+    if (current_token_type() != TokenType::Comma) {
+        err_ = "expected ',' after for start value";
+        return nullptr;
+    }
+    next_token(); // eat ','
+
+    auto end = parse_expression();
+    if (!end) {
+        return nullptr;
+    }
+
+    // The step value is optional.
+    ExpressionPtr step;
+    if (current_token_type() == TokenType::Comma) {
+        next_token(); // eat ','
+        step = parse_expression();
+        if (!step) {
+            return nullptr;
+        }
+    }
+
+    if (current_token_type() != TokenType::In) {
+        err_ = "expected 'in' after for";
+        return nullptr;
+    }
+    next_token(); // eat in
+
+    auto body = parse_expression();
+    if (!body) {
+        return nullptr;
+    }
+    return std::make_unique<ForExpr>(
+        variant_name,
+        std::move(start),
+        std::move(end),
+        std::move(step),
+        std::move(body)
+    );
+}
+
+/// ifexpr ::= 'if' expression 'then' expression 'else' expression
+ExpressionPtr Parser::parse_if_expr() {
+    next_token(); // eat if
+
+    //condition
+    auto cond = parse_expression();
+    if (!cond) return nullptr;
+
+    if (current_token_type() != TokenType::Then) {
+        err_ = "expected token 'then'";
+        return nullptr;
+    }
+    next_token(); // eat then
+
+    auto then = parse_expression();
+    if (!then) return nullptr;
+
+    if (current_token_type() != TokenType::Else) {
+        err_ = "expected token 'else'";
+        return nullptr;        
+    }
+
+    next_token(); // eat else
+    auto _else = parse_expression();
+    if (!_else) return nullptr;
+    return std::make_unique<IfExpr>(std::move(cond), std::move(then), std::move(_else));
 }
 
 /// identifierexpr ::= identifier ['(' expression* ')']+

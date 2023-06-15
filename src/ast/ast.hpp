@@ -14,6 +14,8 @@ public:
     virtual ~Expression() = default;
 };
 
+using ExpressionPtr = std::unique_ptr<Expression>;
+
 struct LiteralExpr: public Expression {
     double value;
     explicit LiteralExpr(double d): value(d) {}
@@ -41,6 +43,19 @@ struct CallExpr: public Expression {
 
     CallExpr(std::string _callee, std::vector<std::unique_ptr<Expression>> _args):
         callee(std::move(_callee)), args(std::move(_args)) {}
+};
+
+struct IfExpr: public Expression {
+    std::unique_ptr<Expression> condition, then, _else;
+    IfExpr(ExpressionPtr c, ExpressionPtr t, ExpressionPtr e): 
+        condition(std::move(c)), then(std::move(t)), _else(std::move(e)) {}
+};
+
+struct ForExpr: public Expression {
+    std::string var_name;
+    ExpressionPtr start, end, step, body;
+    ForExpr(std::string name, ExpressionPtr s, ExpressionPtr e, ExpressionPtr _step, ExpressionPtr b):
+        var_name(std::move(name)), start(std::move(s)), end(std::move(e)), step(std::move(_step)), body(std::move(b)) {}
 };
 
 struct ProtoType {
@@ -90,4 +105,3 @@ using ASTNodePtr = std::unique_ptr<ASTNode>;
 using FunctionNodePtr = std::unique_ptr<FunctionNode>;
 using ExternNodePtr = std::unique_ptr<ExternNode>;
 using ProtoTypePtr = std::unique_ptr<ProtoType>;
-using ExpressionPtr = std::unique_ptr<Expression>;
