@@ -14,7 +14,7 @@ void codegen_helper(std::vector<std::string>& target, std::vector<std::string>& 
     llvm::raw_string_ostream output(ans); 
     auto generator = CodeGenerator(output);
     for (int i = 0; i < target.size(); i++) {
-        auto parser = Parser(Lexer::tokenize(target[i]));
+        auto parser = Parser(Lexer::tokenize(target[i]), generator.binary_oper_precedence_);
         auto asts = parser.parse();
         generator.codegen(std::move(asts));
         ASSERT_EQ(ans, answer[i]);

@@ -54,6 +54,10 @@ std::vector<Token> Lexer::tokenize(std::string target_) {
                         ans.emplace_back(TokenType::For);
                     } else if (token_context == "in") {
                         ans.emplace_back(TokenType::In);
+                    } else if (token_context == "binary") {
+                        ans.emplace_back(TokenType::Binary);
+                    } else if (token_context == "unary") {
+                        ans.emplace_back(TokenType::Unary);
                     } else {
                         ans.emplace_back(TokenType::Identifier, std::string(token_context));
                     }

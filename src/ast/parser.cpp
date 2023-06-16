@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <iostream>
 #include <memory>
 #include <utility>
 #include <vector>
@@ -81,7 +82,7 @@ void Parser::parse_extern() {
 
 /// expression ::= primary binoprhs
 ExpressionPtr Parser::parse_expression() {
-    auto lhs = parse_primary();
+    auto lhs = parse_unary();
     if (!lhs) {
         return nullptr;
     }
@@ -92,13 +93,53 @@ ExpressionPtr Parser::parse_expression() {
 /// prototype ::= id '(' id* ')' 
 /// id in parenthesis are splited by ','
 ProtoTypePtr Parser::parse_prototype() {
-    if (current_token_type() != TokenType::Identifier) {
-        err_ = "Expected function name in prototype";
-        return nullptr;
-    }
+    std::string name = "";
+    unsigned kind = 0; // 0 = ident, 1 = unary, 2 = binary
+    int binary_precedence = 30;
 
-    auto name = (*token_iter_).get_string();
-    next_token();
+    switch (current_token_type()) {
+        case TokenType::Identifier:
+            name = token_iter_->get_string();
+            next_token();
+            kind = 0;
+            break;
+        case TokenType::Binary:
+            next_token(); // eat binary 
+            if (current_token_type() != TokenType::Operator) {
+                err_ = "Expected binary operator";
+                return nullptr;
+            }
+            name = token_iter_->get_string();
+            kind = 2;
+            next_token(); // eat operator
+
+            if (current_token_type() == TokenType::Literal) {
+                double num = token_iter_->get_literal();
+                if (num < 1 || num > 100) {
+                    err_ = "Invalid precedence: must be 1..100";
+                    return nullptr;
+                }
+                binary_precedence = static_cast<int>(num);
+                operator_precedence_[name] = binary_precedence;
+                next_token();
+            }
+            break;
+        case TokenType::Unary:
+            next_token(); // eat unary
+            if (current_token_type() != TokenType::Operator) {
+                err_ = "Expected binary operator";
+                return nullptr;
+            }
+
+            name = token_iter_->get_string();
+            kind = 1;
+            operator_precedence_[name] = 10000; // max precedence
+            next_token(); // eat operator
+            break;
+        default:
+            err_ = "Expected function name in prototype";
+            return nullptr;
+    }
 
     if (current_token_type() != TokenType::LeftParenthesis) {
         err_ = "Expected '(' in prototype";
@@ -130,11 +171,16 @@ ProtoTypePtr Parser::parse_prototype() {
     }
     next_token(); // eat ')'
 
-    return std::make_unique<ProtoType>(name, args);
+    if (kind && args.size() != kind) {
+        err_ = "Invalid number of operands for operator";
+        return nullptr;
+    }
+
+    return std::make_unique<ProtoType>(name, args, kind != 0, binary_precedence);
 }
 
 /// binoprhs::= [operator primary]*
-ExpressionPtr Parser::parse_binary_op_rhs(int prec, ExpressionPtr lhs) {
+ExpressionPtr Parser::parse_binary_op_rhs(int prec, ExpressionPtr lhs) {    
     for (;;) {
         int current_prec = current_token_precedence();
         if (current_prec < 0) {
@@ -152,7 +198,7 @@ ExpressionPtr Parser::parse_binary_op_rhs(int prec, ExpressionPtr lhs) {
         next_token();
 
         // Parse the primary expression after the binary operator.
-        auto rhs = parse_primary();
+        auto rhs = parse_unary();
         if (!rhs) {
             return nullptr;
         }
@@ -277,6 +323,32 @@ ExpressionPtr Parser::parse_if_expr() {
     auto _else = parse_expression();
     if (!_else) return nullptr;
     return std::make_unique<IfExpr>(std::move(cond), std::move(then), std::move(_else));
+}
+
+/// unary
+///   ::= primary
+///   ::= '!' unary
+ExpressionPtr Parser::parse_unary() {
+    // If the current token is not an operator, it must be a primary expr.
+    if (current_token_type() == TokenType::LeftParenthesis
+        || current_token_type() == TokenType::Comma
+        || current_token_type() == TokenType::Identifier
+        || current_token_type() == TokenType::Literal
+        || current_token_type() == TokenType::For
+        || current_token_type() == TokenType::If) {
+        return parse_primary();
+    }
+
+    if (current_token_type() == TokenType::Operator) {
+        std::string name = token_iter_->get_string();
+        next_token(); // eat unary 
+        if (auto opnd = parse_unary()) {
+            return std::make_unique<UnaryExpr>(name, std::move(opnd));
+        }
+    }
+
+    err_ = "parse unary unsuccess";
+    return nullptr;
 }
 
 /// identifierexpr ::= identifier ['(' expression* ')']+

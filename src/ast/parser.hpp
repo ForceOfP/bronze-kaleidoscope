@@ -15,7 +15,8 @@
 
 class Parser {
 public:
-    explicit Parser(std::vector<Token>&& v): tokens_(std::move(v)) {
+    explicit Parser(std::vector<Token>&& v, std::map<std::string, int>& prec)
+        : tokens_(std::move(v)), operator_precedence_(prec) {
         token_iter_ = tokens_.begin();
     }
 
@@ -30,6 +31,7 @@ public:
     ExpressionPtr parse_binary_op_rhs(int prec, ExpressionPtr lhs);
     ExpressionPtr parse_primary();
 
+    ExpressionPtr parse_unary();
     ExpressionPtr parse_if_expr();
     ExpressionPtr parse_for_expr();
     ExpressionPtr parse_identifier_expr();
@@ -45,5 +47,6 @@ private:
     std::vector<ASTNodePtr> ast_tree_;
     TokenVecIter token_iter_;
     std::string err_;
-    std::map<std::string, int> operator_precedence_ = {{"<", 10}, {"+", 20}, {"-", 20}, {"*", 40}};
+    std::map<std::string, int>& operator_precedence_;
+    //std::map<std::string, unsigned> operator_precedence_ = {{"<", 10}, {"+", 20}, {"-", 20}, {"*", 40}};
 };

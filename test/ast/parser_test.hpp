@@ -5,6 +5,8 @@
 #include "ast/lexer.hpp"
 #include "ast/parser.hpp"
 
+std::map<std::string, int> parser_prec = {{"<", 10}, {"+", 20}, {"-", 20}, {"*", 40}};
+
 std::string serialize_asts(std::vector<ASTNodePtr>& asts) {
     std::stringstream ss;
 
@@ -38,7 +40,7 @@ TEST(AST, parse) {
 
     assert(target.size() == answer.size());
     for (int i = 0; i < target.size(); i++) {
-        auto parser = Parser(Lexer::tokenize(target[i]));
+        auto parser = Parser(Lexer::tokenize(target[i]), parser_prec);
         auto ans = parser.parse();
 
         ASSERT_EQ(serialize_asts(ans), answer[i]);

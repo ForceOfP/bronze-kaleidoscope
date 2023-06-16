@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cassert>
 #include <memory>
 #include <ostream>
 #include <string>
@@ -58,16 +59,37 @@ struct ForExpr: public Expression {
         var_name(std::move(name)), start(std::move(s)), end(std::move(e)), step(std::move(_step)), body(std::move(b)) {}
 };
 
+struct UnaryExpr: public Expression {
+    std::string _operater;
+    ExpressionPtr operand;
+
+    UnaryExpr(std::string name, ExpressionPtr opnd):
+        _operater(std::move(name)), operand(std::move(opnd)) {}
+};
+
 struct ProtoType {
     std::string name;
     std::vector<std::string> args;
+    bool is_operator_;
+    unsigned precedence_;
 
-    ProtoType(std::string _name, std::vector<std::string> _args):
-        name(std::move(_name)), args(std::move(_args)) {}
+    ProtoType(std::string _name, std::vector<std::string> _args,
+                bool is_oper = false, unsigned prec = 0):
+        name(std::move(_name)), args(std::move(_args)), is_operator_(is_oper), precedence_(prec) {}
 
     ProtoType(): name(""), args({}) {}
 
     friend std::ostream& operator<<(std::ostream& os, const ProtoType& t);
+
+    [[nodiscard]] bool is_unary_oper() const {return is_operator_ && args.size() == 1;}
+    [[nodiscard]] bool is_binary_oper() const {return is_operator_ && args.size() == 2;}
+
+    [[nodiscard]] std::string get_operator_name() const {
+        assert(is_binary_oper() || is_unary_oper());
+        return name;
+    }
+
+    [[nodiscard]] unsigned get_binary_precedence() const { return precedence_; }
 };
 
 struct ExternNode {

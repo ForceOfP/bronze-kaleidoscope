@@ -1,7 +1,11 @@
 #include "token.hpp"
 
 std::string Token::get_string() const {
-    assert(this->type_ == TokenType::Identifier || this->type_ == TokenType::Operator);
+    assert(
+        this->type_ == TokenType::Identifier
+        || this->type_ == TokenType::Operator
+        || this->type_ == TokenType::Binary
+        || this->type_ == TokenType::Unary);
 
     return std::any_cast<std::string>(this->value_);
 }

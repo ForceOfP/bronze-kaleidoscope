@@ -18,6 +18,7 @@ class CodeGenerator {
 public:
     explicit CodeGenerator(llvm::raw_ostream&);
 
+    llvm::Value* codegen(std::unique_ptr<UnaryExpr> e);
     llvm::Value* codegen(std::unique_ptr<ForExpr> e);
     llvm::Value* codegen(std::unique_ptr<IfExpr> e);
     llvm::Value* codegen(std::unique_ptr<CallExpr> e);
@@ -30,6 +31,8 @@ public:
     llvm::Function* codegen(FunctionNode& f);
 
     void codegen(std::vector<ASTNodePtr>&&);
+
+    std::map<std::string, int> binary_oper_precedence_ = {{"<", 10}, {"+", 20}, {"-", 20}, {"*", 40}};
 private:
     void initialize_llvm_elements();
     llvm::Function* get_function(std::string& name);

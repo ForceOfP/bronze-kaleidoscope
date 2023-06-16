@@ -1,5 +1,7 @@
 #include "codegen.hpp"
 
+#include <llvm-15/llvm/IR/Function.h>
+#include <llvm-15/llvm/IR/Value.h>
 #include <llvm/Transforms/Scalar.h>
 #include <llvm/Transforms/Scalar/GVN.h>
 #include <llvm/IR/LegacyPassManager.h>
@@ -48,6 +50,21 @@ CodeGenerator::CodeGenerator(llvm::raw_ostream& os): output_stream_(os) {
     jit_ = exit_on_error_(OrcJitEngine::create());
 
     initialize_llvm_elements();
+}
+
+llvm::Value* CodeGenerator::codegen(std::unique_ptr<UnaryExpr> e) {
+    llvm::Value* opnd_value = codegen(std::move(e->operand));
+    if (!opnd_value) {
+        return nullptr;
+    }
+
+    llvm::Function* f = get_function(e->_operater);
+    if (!f) {
+        err_ = "Unknown unary operator";
+        return nullptr;
+    }
+
+    return builder_->CreateCall(f, opnd_value, "unop");
 }
 
 // Output for-loop as:
@@ -228,8 +245,10 @@ llvm::Value* CodeGenerator::codegen(std::unique_ptr<BinaryExpr> e) {
         return builder_->CreateUIToFP(l, llvm::Type::getDoubleTy(*context_), "booltmp");
     }
 
-    err_ = "invalid binary operator";
-    return nullptr;
+    llvm::Function* f = get_function(e->oper);
+    assert(f && "binary operator not found!");
+    llvm::Value* ops[2] = {l, r};
+    return builder_->CreateCall(f, ops, "binop");
 }
 
 llvm::Value* CodeGenerator::codegen(std::unique_ptr<VariableExpr> e) {
@@ -282,6 +301,12 @@ llvm::Value* CodeGenerator::codegen(std::unique_ptr<Expression> e) {
         return codegen(std::move(tmp));
     }
 
+    auto u = dynamic_cast<UnaryExpr*>(raw);
+    if (u) {
+        std::unique_ptr<UnaryExpr> tmp(u);
+        return codegen(std::move(tmp));        
+    }
+
     return nullptr;
 }
 
@@ -316,6 +341,10 @@ llvm::Function* CodeGenerator::codegen(FunctionNode& f) {
     if (!function) {
         return nullptr;
     }
+
+/*     if (f.prototype->is_binary_oper()) {
+        binary_oper_precedence_[f.prototype->get_operator_name()] = f.prototype->get_binary_precedence();
+    } */
 
     llvm::BasicBlock* basic_block = llvm::BasicBlock::Create(*context_, "entry", function);
     builder_->SetInsertPoint(basic_block);
