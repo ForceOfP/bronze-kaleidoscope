@@ -35,14 +35,16 @@ void CodeGenerator::initialize_llvm_elements() {
     module_->setDataLayout(jit_->get_data_layout());
 
     builder_ = std::make_unique<llvm::IRBuilder<>>(*context_);    
-    function_pass_manager_ = std::make_unique<llvm::legacy::FunctionPassManager>(module_.get());
-
-    function_pass_manager_->add(llvm::createInstructionCombiningPass());
-    function_pass_manager_->add(llvm::createReassociatePass());
-    function_pass_manager_->add(llvm::createGVNPass());
-    function_pass_manager_->add(llvm::createCFGSimplificationPass());
-
-    function_pass_manager_->doInitialization();
+    if (setting_.function_pass_optimize) {
+        function_pass_manager_ = std::make_unique<llvm::legacy::FunctionPassManager>(module_.get());
+    
+        function_pass_manager_->add(llvm::createInstructionCombiningPass());
+        function_pass_manager_->add(llvm::createReassociatePass());
+        function_pass_manager_->add(llvm::createGVNPass());
+        function_pass_manager_->add(llvm::createCFGSimplificationPass());
+    
+        function_pass_manager_->doInitialization();
+    }
 }
 
 CodeGenerator::CodeGenerator(llvm::raw_ostream& os): output_stream_(os) {
@@ -360,7 +362,9 @@ llvm::Function* CodeGenerator::codegen(FunctionNode& f) {
         // Validate the generated code, checking for consistency.
         llvm::verifyFunction(*function);
 
-        function_pass_manager_->run(*function);
+        if (setting_.function_pass_optimize) {
+            function_pass_manager_->run(*function);
+        }
         
         return function;
     }
@@ -405,7 +409,11 @@ void CodeGenerator::codegen(std::vector<ASTNodePtr>&& ast_tree) {
                     }
                 } else {
                     if (auto ir = codegen(f)) {
-                        ir->print(output_stream_);
+                        if (setting_.print_ir) {
+                            ir->print(output_stream_);
+                        } else {
+                            output_stream_ << "parsed definition.\n";
+                        }
                         exit_on_error_(jit_->add_module(
                             llvm::orc::ThreadSafeModule(std::move(module_),std::move(context_))
                         ));

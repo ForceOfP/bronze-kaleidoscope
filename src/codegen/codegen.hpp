@@ -14,6 +14,11 @@
 #include "ast/ast.hpp"
 #include "jit_engine.hpp"
 
+struct CodeGeneratorSetting {
+    bool print_ir = true;
+    bool function_pass_optimize = true;
+};
+
 class CodeGenerator {
 public:
     explicit CodeGenerator(llvm::raw_ostream&);
@@ -33,6 +38,7 @@ public:
     void codegen(std::vector<ASTNodePtr>&&);
 
     std::map<std::string, int> binary_oper_precedence_ = {{"<", 10}, {"+", 20}, {"-", 20}, {"*", 40}};
+    CodeGeneratorSetting setting_;
 private:
     void initialize_llvm_elements();
     llvm::Function* get_function(std::string& name);
@@ -49,3 +55,4 @@ private:
     llvm::ExitOnError exit_on_error_;
     llvm::raw_ostream& output_stream_;
 };
+
