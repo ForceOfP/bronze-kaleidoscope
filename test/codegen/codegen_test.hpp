@@ -117,6 +117,7 @@ TEST(CODEGEN, ifelse) {
     codegen_helper(target, answer);
 }
 
+// TODO(lbt): this example should be updated.
 TEST(CODEGEN, loop) {
     std::vector<std::string> target = {
         "extern putchard(char)",
@@ -128,7 +129,6 @@ TEST(CODEGEN, loop) {
     std::vector<std::string> answer = {
         "declare double @putchard(double)\n",
         "parsed definition.\n",
-        // TODO(lbt): this example should be updated.
         "0.000000\n",
         "0.000000\n"
     };
@@ -137,3 +137,47 @@ TEST(CODEGEN, loop) {
     codegen_helper(target, answer);
 }
 
+TEST(CODEGEN, oper) {
+    std::vector<std::string> target = {
+        "def unary - (v) 0 - v;",
+        "-(2+3)",
+        "def unary ! (v) if v then 0 else 1;",
+        "!1",
+        "!0",
+        "def binary | 5 (LHS, RHS) if LHS then 1 else if RHS then 1 else 0;",
+        "0|0",
+        "1|0",
+        "def binary & 6 (LHS, RHS) if !LHS then 0 else !!RHS;",
+        "1&0",
+        "1&1",
+        "def binary > 10 (LHS, RHS) RHS < LHS;",
+        "1 > 2",
+        "2 > 1",
+        "def binary = 9 (LHS, RHS) !(LHS < RHS | LHS > RHS);",
+        "1=2",
+        "2=2",
+    };
+
+    std::vector<std::string> answer = {
+        "parsed definition.\n",
+        "-5.000000\n",
+        "parsed definition.\n",
+        "0.000000\n",
+        "1.000000\n",
+        "parsed definition.\n",
+        "0.000000\n",
+        "1.000000\n",
+        "parsed definition.\n",
+        "0.000000\n",
+        "1.000000\n",
+        "parsed definition.\n",
+        "0.000000\n",
+        "1.000000\n",
+        "parsed definition.\n",
+        "0.000000\n",
+        "1.000000\n",
+    };
+
+    assert(target.size() == answer.size());
+    codegen_helper(target, answer);
+}
