@@ -67,6 +67,14 @@ struct UnaryExpr: public Expression {
         _operater(std::move(name)), operand(std::move(opnd)) {}
 };
 
+struct VarExpr: public Expression {
+    std::vector<std::pair<std::string, ExpressionPtr>> var_names;
+    ExpressionPtr body;
+
+    VarExpr(std::vector<std::pair<std::string, ExpressionPtr>> vars, ExpressionPtr _body):
+        var_names(std::move(vars)), body(std::move(_body)) {}
+};
+
 struct ProtoType {
     std::string name;
     std::vector<std::string> args;

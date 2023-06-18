@@ -31,6 +31,7 @@ public:
     ExpressionPtr parse_binary_op_rhs(int prec, ExpressionPtr lhs);
     ExpressionPtr parse_primary();
 
+    ExpressionPtr parse_var_expr();
     ExpressionPtr parse_unary();
     ExpressionPtr parse_if_expr();
     ExpressionPtr parse_for_expr();

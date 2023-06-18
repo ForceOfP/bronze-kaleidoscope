@@ -1,7 +1,9 @@
 #include "codegen.hpp"
 
-#include <llvm-15/llvm/IR/Function.h>
+#include <llvm-15/llvm/ADT/APFloat.h>
+#include <llvm-15/llvm/IR/Instructions.h>
 #include <llvm-15/llvm/IR/Value.h>
+#include <llvm/Transforms/Utils.h>
 #include <llvm/Transforms/Scalar.h>
 #include <llvm/Transforms/Scalar/GVN.h>
 #include <llvm/IR/LegacyPassManager.h>
@@ -37,7 +39,8 @@ void CodeGenerator::initialize_llvm_elements() {
     builder_ = std::make_unique<llvm::IRBuilder<>>(*context_);    
     if (setting_.function_pass_optimize) {
         function_pass_manager_ = std::make_unique<llvm::legacy::FunctionPassManager>(module_.get());
-    
+
+        function_pass_manager_->add(llvm::createPromoteMemoryToRegisterPass());
         function_pass_manager_->add(llvm::createInstructionCombiningPass());
         function_pass_manager_->add(llvm::createReassociatePass());
         function_pass_manager_->add(llvm::createGVNPass());
@@ -52,6 +55,60 @@ CodeGenerator::CodeGenerator(llvm::raw_ostream& os): output_stream_(os) {
     jit_ = exit_on_error_(OrcJitEngine::create());
 
     initialize_llvm_elements();
+}
+
+llvm::AllocaInst* CodeGenerator::create_entry_block_alloca(llvm::Function* function, const std::string& var_name) {
+    llvm::IRBuilder<> builder(&function->getEntryBlock(), function->getEntryBlock().begin());
+    return builder.CreateAlloca(llvm::Type::getDoubleTy(*context_), nullptr, var_name);
+}
+
+llvm::Value* CodeGenerator::codegen(std::unique_ptr<VarExpr> e) {
+    std::vector<llvm::AllocaInst*> old_bindings_{};
+    llvm::Function* function = builder_->GetInsertBlock()->getParent();
+
+    // Register all variables and emit their initializer.
+    for (auto i = 0; i < e->var_names.size(); i++) {
+        const std::string& var_name = e->var_names[i].first;
+        auto init = std::move(e->var_names[i].second);
+
+        // Emit the initializer before adding the variable to scope, this prevents
+        // the initializer from referencing the variable itself, and permits stuff
+        // like this:
+        //  var a = 1 in
+        //    var a = a in ...   # refers to outer 'a'.
+        llvm::Value* init_value;
+        if (init) {
+            init_value = codegen(std::move(init));
+            if (!init_value) {
+                return nullptr;
+            }
+        } else { // If not specified, use 0.0.
+            init_value = llvm::ConstantFP::get(*context_, llvm::APFloat(0.0));
+        }
+
+        llvm::AllocaInst* alloca = create_entry_block_alloca(function, var_name);
+        builder_->CreateStore(init_value, alloca);
+
+        // Remember the old variable binding so that we can restore the binding when
+        // we unrecurse.
+        old_bindings_.push_back(named_values_alloca_[var_name]);
+
+        named_values_alloca_[var_name] = alloca;
+    }
+
+    // Codegen the body, now that all vars are in scope.
+    llvm::Value* body_val = codegen(std::move(e->body));
+    if (!body_val) {
+        return nullptr;
+    }
+
+    // Pop all our variables from scope.
+    for (auto i = 0; i < e->var_names.size(); i++) {
+        named_values_alloca_[e->var_names[i].first] = old_bindings_[i];
+    }
+
+    // Return the body computation.
+    return body_val;
 }
 
 llvm::Value* CodeGenerator::codegen(std::unique_ptr<UnaryExpr> e) {
@@ -85,25 +142,29 @@ llvm::Value* CodeGenerator::codegen(std::unique_ptr<UnaryExpr> e) {
 //   br endcond, loop, endloop
 // outloop:
 llvm::Value* CodeGenerator::codegen(std::unique_ptr<ForExpr> e) {
+    llvm::Function* function = builder_->GetInsertBlock()->getParent();
+    llvm::AllocaInst* alloca = create_entry_block_alloca(function, e->var_name);
+
     auto start_value = codegen(std::move(e->start));
     if (!start_value) {
         return nullptr;
     }
+    builder_->CreateStore(start_value, alloca);
 
-    llvm::Function* function = builder_->GetInsertBlock()->getParent();
-    llvm::BasicBlock* pre_header_block = builder_->GetInsertBlock();
+    // llvm::BasicBlock* pre_header_block = builder_->GetInsertBlock();
     llvm::BasicBlock* loop_block = llvm::BasicBlock::Create(*context_, "loop", function);
 
     builder_->CreateBr(loop_block);
     builder_->SetInsertPoint(loop_block);
+    
     // Start the PHI node with an entry for Start.
-    llvm::PHINode* phi = builder_->CreatePHI(llvm::Type::getDoubleTy(*context_), 2, e->var_name);
-    phi->addIncoming(start_value, pre_header_block);
+    // llvm::PHINode* phi = builder_->CreatePHI(llvm::Type::getDoubleTy(*context_), 2, e->var_name);
+    // phi->addIncoming(start_value, pre_header_block);
 
     // Within the loop, the variable is defined equal to the PHI node.  If it
     // shadows an existing variable, we have to restore it, so save it now.
-    llvm::Value* old = named_values_[e->var_name];
-    named_values_[e->var_name] = phi;
+    auto old = named_values_alloca_[e->var_name];
+    named_values_alloca_[e->var_name] = alloca;
 
     // Emit the body of the loop.  This, like any other expr, can change the
     // current BB.  Note that we ignore the value computed by the body, but don't
@@ -122,26 +183,32 @@ llvm::Value* CodeGenerator::codegen(std::unique_ptr<ForExpr> e) {
         step_value = llvm::ConstantFP::get(*context_, llvm::APFloat(1.0)); // default step is 1.0
     }
 
-    llvm::Value* next_var = builder_->CreateFAdd(phi, step_value, "nextvar");
+    // llvm::Value* next_var = builder_->CreateFAdd(phi, step_value, "nextvar");
     auto end_condition = codegen(std::move(e->end));
     if (!end_condition) {
         return nullptr;
     }
 
+    // Reload, increment, and restore the alloca.  This handles the case where
+    // the body of the loop mutates the variable.
+    llvm::Value* now_var = builder_->CreateLoad(alloca->getAllocatedType(), alloca, std::string(e->var_name));
+    llvm::Value* next_var = builder_->CreateFAdd(now_var, step_value, "nextvar");
+    builder_->CreateStore(next_var, alloca);
+
     end_condition = builder_->CreateFCmpONE(
         end_condition, llvm::ConstantFP::get(*context_, llvm::APFloat(0.0)), "loopcond");
     
-    llvm::BasicBlock* loop_end_block = builder_->GetInsertBlock();
+    // llvm::BasicBlock* loop_end_block = builder_->GetInsertBlock();
     llvm::BasicBlock* after_block = llvm::BasicBlock::Create(*context_, "afterloop", function);
 
     builder_->CreateCondBr(end_condition, loop_block, after_block);
     builder_->SetInsertPoint(after_block);
 
-    phi->addIncoming(next_var, loop_end_block);
+    // phi->addIncoming(next_var, loop_end_block);
     if (old) {
-        named_values_[e->var_name] = old;
+        named_values_alloca_[e->var_name] = old;
     } else {
-        named_values_.erase(e->var_name);
+        named_values_alloca_.erase(e->var_name);
     }
 
     // for expr always returns 0.0.
@@ -227,6 +294,29 @@ llvm::Value* CodeGenerator::codegen(std::unique_ptr<CallExpr> e) {
 }
 
 llvm::Value* CodeGenerator::codegen(std::unique_ptr<BinaryExpr> e) {
+    // Special case '=' because we don't want to emit the LHS as an expression.
+    if (e->oper == "=") {
+        auto lhse = static_cast<VariableExpr*>(e->lhs.get());
+        if (!lhse) {
+            err_ = "destination of '=' must be a variable";
+            return nullptr;
+        }
+
+        llvm::Value* rhs_value = codegen(std::move(e->rhs));
+        if (!rhs_value) {
+            return nullptr;
+        }
+
+        llvm::Value* lhs_value_alloca = named_values_alloca_[lhse->name]; 
+        if (!lhs_value_alloca) {
+            err_ = "Unknown variable name";
+            return nullptr;
+        }
+
+        builder_->CreateStore(rhs_value, lhs_value_alloca);
+        return rhs_value; // support a = (b = c);
+    }
+    
     llvm::Value* l = codegen(std::move(e->lhs));
     llvm::Value* r = codegen(std::move(e->rhs));
     if (!r || !l) {
@@ -254,11 +344,13 @@ llvm::Value* CodeGenerator::codegen(std::unique_ptr<BinaryExpr> e) {
 }
 
 llvm::Value* CodeGenerator::codegen(std::unique_ptr<VariableExpr> e) {
-    if (!named_values_.count(e->name)) {
+    auto a = named_values_alloca_[e->name];
+    if (!a) {
         err_ = "Unknown variable name";
         return nullptr;
     }
-    return named_values_[e->name];
+    return builder_->CreateLoad(a->getAllocatedType(), a, e->name.c_str());
+    // return named_values_[e->name];
 }
 
 llvm::Value* CodeGenerator::codegen(std::unique_ptr<LiteralExpr> e) {
@@ -309,6 +401,12 @@ llvm::Value* CodeGenerator::codegen(std::unique_ptr<Expression> e) {
         return codegen(std::move(tmp));        
     }
 
+    auto var = dynamic_cast<VarExpr*>(raw);
+    if (var) {
+        std::unique_ptr<VarExpr> tmp(var);
+        return codegen(std::move(tmp));  
+    }
+
     return nullptr;
 }
 
@@ -351,9 +449,16 @@ llvm::Function* CodeGenerator::codegen(FunctionNode& f) {
     llvm::BasicBlock* basic_block = llvm::BasicBlock::Create(*context_, "entry", function);
     builder_->SetInsertPoint(basic_block);
 
-    named_values_.clear();
+    // Record the function arguments in the NamedValues map.
+    named_values_alloca_.clear();
     for (auto& arg: function->args()) {
-        named_values_.insert({std::string(arg.getName()), &arg});
+        // Create an alloca for this variable.
+        auto alloca = create_entry_block_alloca(function, std::string(arg.getName()));
+
+        // Store the initial value into the alloca.
+        builder_->CreateStore(&arg, alloca);
+
+        named_values_alloca_.insert({std::string(arg.getName()), alloca});
     }
 
     if (llvm::Value* return_value = codegen(std::move(f.body))) {

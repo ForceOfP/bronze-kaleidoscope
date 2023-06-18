@@ -25,6 +25,7 @@ enum class TokenType {
     In,
     Binary, // with a string
     Unary, // with a string
+    Var,
     Init
 };
 
@@ -73,9 +74,11 @@ public:
         case TokenType::In:
             os << "[In]"; break;
         case TokenType::Binary:
-            os << "[Binary]"; break;
+            os << "[Binary: " << t.get_string() << "]"; break;
         case TokenType::Unary:
-            os << "[Unary]"; break;
+            os << "[Unary: " << t.get_string() << "]"; break;
+        case TokenType::Var:
+            os << "[Var]"; break;
         default:
             break;
         }

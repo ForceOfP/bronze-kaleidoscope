@@ -230,10 +230,61 @@ ExpressionPtr Parser::parse_primary() {
         return parse_if_expr();
     case TokenType::For:
         return parse_for_expr();
+    case TokenType::Var:
+        return parse_var_expr();
     default:
         err_ = "unknown token when expecting an expression";
         return nullptr;
     }
+}
+
+/// varexpr ::= 'var' identifier ('=' expression)?
+//                    (',' identifier ('=' expression)?)* 'in' expression
+ExpressionPtr Parser::parse_var_expr() {
+    next_token(); // eat var
+    std::vector<std::pair<std::string, ExpressionPtr>> names;
+
+    // At least one variable name is required.
+    if (current_token_type() != TokenType::Identifier) {
+        err_ = "expected identifier after var";
+        return nullptr;
+    }
+
+    for (;;) {
+        std::string name = token_iter_->get_string();
+        next_token(); // eat identifier
+
+        ExpressionPtr init = nullptr;
+        if (current_token_type() == TokenType::Operator && token_iter_->get_string() == "=") {
+            next_token(); // eat the '=';
+
+            init = parse_expression();
+            if (!init) return nullptr;
+        }
+
+        names.emplace_back(name, std::move(init));
+
+        if (current_token_type() != TokenType::Comma) break;
+        next_token(); // eat ','
+
+        if (current_token_type() != TokenType::Identifier) {
+            err_ = "expected identifier list after var";
+            return nullptr;
+        }
+    }
+
+    if (current_token_type() != TokenType::In) {
+        err_ = "expected 'in' keyword after 'var'";
+        return nullptr;
+    }
+    next_token(); // eat in
+
+    auto body = parse_expression();
+    if (!body) {
+        return nullptr;
+    }
+
+    return std::make_unique<VarExpr>(std::move(names), std::move(body));
 }
 
 /// forexpr ::= 'for' identifier '=' expr ',' expr (',' expr)? 'in' expression
@@ -335,7 +386,8 @@ ExpressionPtr Parser::parse_unary() {
         || current_token_type() == TokenType::Identifier
         || current_token_type() == TokenType::Literal
         || current_token_type() == TokenType::For
-        || current_token_type() == TokenType::If) {
+        || current_token_type() == TokenType::If
+        || current_token_type() == TokenType::Var) {
         return parse_primary();
     }
 

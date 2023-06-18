@@ -1,5 +1,7 @@
 #pragma once
 
+#include <llvm-15/llvm/IR/Function.h>
+#include <llvm/IR/Instructions.h>
 #include <llvm/Support/Error.h>
 #include <llvm/IR/LegacyPassManager.h>
 #include <llvm/IR/Function.h>
@@ -23,6 +25,7 @@ class CodeGenerator {
 public:
     explicit CodeGenerator(llvm::raw_ostream&);
 
+    llvm::Value* codegen(std::unique_ptr<VarExpr> e);
     llvm::Value* codegen(std::unique_ptr<UnaryExpr> e);
     llvm::Value* codegen(std::unique_ptr<ForExpr> e);
     llvm::Value* codegen(std::unique_ptr<IfExpr> e);
@@ -37,11 +40,18 @@ public:
 
     void codegen(std::vector<ASTNodePtr>&&);
 
-    std::map<std::string, int> binary_oper_precedence_ = {{"<", 10}, {"+", 20}, {"-", 20}, {"*", 40}};
+    std::map<std::string, int> binary_oper_precedence_ = {
+        {"=", 2},
+        {"<", 10},
+        {"+", 20},
+        {"-", 20}, 
+        {"*", 40}
+    };
     CodeGeneratorSetting setting_;
 private:
     void initialize_llvm_elements();
     llvm::Function* get_function(std::string& name);
+    llvm::AllocaInst* create_entry_block_alloca(llvm::Function* function, const std::string& var_name);
 private:
     std::unique_ptr<llvm::LLVMContext> context_;
     std::unique_ptr<llvm::IRBuilder<>> builder_;
@@ -49,7 +59,8 @@ private:
     std::unique_ptr<llvm::legacy::FunctionPassManager> function_pass_manager_;
     std::unique_ptr<OrcJitEngine> jit_;
 
-    std::map<std::string, llvm::Value*> named_values_;
+    //std::map<std::string, llvm::Value*> named_values_;
+    std::map<std::string, llvm::AllocaInst*> named_values_alloca_;
     std::map<std::string, ProtoType> function_protos_ = {};
     std::string err_;
     llvm::ExitOnError exit_on_error_;
