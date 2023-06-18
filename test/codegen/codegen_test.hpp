@@ -117,20 +117,17 @@ TEST(CODEGEN, ifelse) {
     codegen_helper(target, answer);
 }
 
-// TODO(lbt): this example should be updated.
 TEST(CODEGEN, loop) {
     std::vector<std::string> target = {
-        "extern putchard(char)",
-        "def printstar(n) for i = 0, i < n, 1.0 in putchard(42);",
-        "printstar(20)",
-        "printstar(30)"
+        "def binary : 1 (x, y) y;",
+        "def sum(n) var a = 0, b = 0 in (for i = 0, i < n in b = a + b : a = a + 1) : b",
+        "sum(100)",
     };
 
     std::vector<std::string> answer = {
-        "declare double @putchard(double)\n",
         "parsed definition.\n",
-        "0.000000\n",
-        "0.000000\n"
+        "parsed definition.\n",
+        "5050.000000\n",
     };
 
     assert(target.size() == answer.size());
@@ -153,9 +150,6 @@ TEST(CODEGEN, oper) {
         "def binary > 10 (LHS, RHS) RHS < LHS;",
         "1 > 2",
         "2 > 1",
-        "def binary = 9 (LHS, RHS) !(LHS < RHS | LHS > RHS);",
-        "1=2",
-        "2=2",
     };
 
     std::vector<std::string> answer = {
@@ -173,9 +167,23 @@ TEST(CODEGEN, oper) {
         "parsed definition.\n",
         "0.000000\n",
         "1.000000\n",
+    };
+
+    assert(target.size() == answer.size());
+    codegen_helper(target, answer);
+}
+
+TEST(CODEGEN, variant) {
+    std::vector<std::string> target = {
+        "def binary : 1 (x, y) y;",
+        "def fibi(x) var a = 1, b = 1, c in (for i = 3, i < x in c = a + b : a = b : b = c) : b;",
+        "fibi(10)",
+    };
+
+    std::vector<std::string> answer = {
         "parsed definition.\n",
-        "0.000000\n",
-        "1.000000\n",
+        "parsed definition.\n",
+        "55.000000\n",
     };
 
     assert(target.size() == answer.size());
