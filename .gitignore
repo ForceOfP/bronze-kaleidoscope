@@ -13,3 +13,4 @@ ut_test
 *.json
 *.so
 .VSCodeCounter
+target/*

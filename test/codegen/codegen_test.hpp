@@ -12,7 +12,7 @@
 void codegen_helper(std::vector<std::string>& target, std::vector<std::string>& answer) {
     std::string ans = "";
     llvm::raw_string_ostream output(ans); 
-    auto generator = CodeGenerator(output);
+    auto generator = CodeGenerator(output, true);
     generator.setting_.print_ir = false;
     for (int i = 0; i < target.size(); i++) {
         auto parser = Parser(Lexer::tokenize(target[i]), generator.binary_oper_precedence_);

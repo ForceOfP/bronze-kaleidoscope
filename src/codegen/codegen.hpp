@@ -1,6 +1,5 @@
 #pragma once
 
-#include <llvm-15/llvm/IR/Function.h>
 #include <llvm/IR/Instructions.h>
 #include <llvm/Support/Error.h>
 #include <llvm/IR/LegacyPassManager.h>
@@ -19,11 +18,12 @@
 struct CodeGeneratorSetting {
     bool print_ir = true;
     bool function_pass_optimize = true;
+    bool use_jit_else_compile = false;
 };
 
 class CodeGenerator {
 public:
-    explicit CodeGenerator(llvm::raw_ostream&);
+    explicit CodeGenerator(llvm::raw_ostream&, bool);
 
     llvm::Value* codegen(std::unique_ptr<VarExpr> e);
     llvm::Value* codegen(std::unique_ptr<UnaryExpr> e);
@@ -39,7 +39,8 @@ public:
     llvm::Function* codegen(FunctionNode& f);
 
     void codegen(std::vector<ASTNodePtr>&&);
-
+    void print(std::string&& file_addr);
+public:
     std::map<std::string, int> binary_oper_precedence_ = {
         {"=", 2},
         {"<", 10},

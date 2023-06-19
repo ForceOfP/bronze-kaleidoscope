@@ -1,8 +1,15 @@
 #include "codegen.hpp"
 
-#include <llvm-15/llvm/ADT/APFloat.h>
-#include <llvm-15/llvm/IR/Instructions.h>
-#include <llvm-15/llvm/IR/Value.h>
+#include <llvm/ADT/Optional.h>
+#include <llvm/IR/Instructions.h>
+#include <llvm/IR/LegacyPassManager.h>
+#include <llvm/IR/Value.h>
+#include <llvm/Support/CodeGen.h>
+#include <llvm/Support/FileSystem.h>
+#include <llvm/Support/raw_ostream.h>
+#include <llvm/Target/TargetOptions.h>
+#include <llvm-c/TargetMachine.h>
+#include <llvm/MC/TargetRegistry.h>
 #include <llvm/Transforms/Utils.h>
 #include <llvm/Transforms/Scalar.h>
 #include <llvm/Transforms/Scalar/GVN.h>
@@ -23,7 +30,9 @@
 #include <llvm/Support/raw_ostream.h>
 
 #include <memory>
+#include <optional>
 #include <string>
+#include <system_error>
 #include <utility>
 #include <vector>
 #include <cassert>
@@ -31,10 +40,62 @@
 #include "ast/ast.hpp"
 #include "codegen/jit_engine.hpp"
 
+void CodeGenerator::print(std::string&& file_addr) {
+    LLVMInitializeAllTargetInfos();
+    LLVMInitializeAllTargets();
+    LLVMInitializeAllTargetMCs();
+    LLVMInitializeAllAsmParsers();
+    LLVMInitializeAllAsmPrinters();
+
+    auto target_triple = LLVMGetDefaultTargetTriple();
+    module_->setTargetTriple(target_triple);
+
+    std::string target_error;
+    auto target = llvm::TargetRegistry::lookupTarget(target_triple, target_error);
+    if (!target) {
+        output_stream_ << target_error << '\n';
+        exit(1);
+    }
+
+    auto cpu = "generic";
+    auto features = "";
+
+    llvm::TargetOptions opt;
+    auto rm = llvm::Optional<llvm::Reloc::Model>();
+
+    auto target_machine = target->createTargetMachine(
+        target_triple, cpu, features, opt, rm);
+
+    module_->setDataLayout(target_machine->createDataLayout());
+
+    std::error_code ec;
+    llvm::raw_fd_ostream dest(file_addr, ec, llvm::sys::fs::OF_None);
+
+    if (ec) {
+        output_stream_ << "Could not open file: " << ec.message() << '\n';\
+        exit(1);
+    }
+
+    llvm::legacy::PassManager pass;
+    auto file_type = llvm::CGFT_ObjectFile;
+
+    if (target_machine->addPassesToEmitFile(pass, dest, nullptr, file_type)) {
+        output_stream_ << "TargetMachine can't emit a file of this type\n";
+        exit(1);
+    }
+
+    pass.run(*module_);
+    dest.flush();
+
+    output_stream_ << "Wrote " << file_addr << "\n";
+}
+
 void CodeGenerator::initialize_llvm_elements() {
     context_ = std::make_unique<llvm::LLVMContext>();
     module_ = std::make_unique<llvm::Module>("my cool jit", *context_);
-    module_->setDataLayout(jit_->get_data_layout());
+    if (setting_.use_jit_else_compile) {
+        module_->setDataLayout(jit_->get_data_layout());
+    }
 
     builder_ = std::make_unique<llvm::IRBuilder<>>(*context_);    
     if (setting_.function_pass_optimize) {
@@ -50,9 +111,12 @@ void CodeGenerator::initialize_llvm_elements() {
     }
 }
 
-CodeGenerator::CodeGenerator(llvm::raw_ostream& os): output_stream_(os) {
+CodeGenerator::CodeGenerator(llvm::raw_ostream& os, bool use_jit): output_stream_(os) {
+    setting_.use_jit_else_compile = use_jit;
     exit_on_error_ = llvm::ExitOnError();
-    jit_ = exit_on_error_(OrcJitEngine::create());
+    if (setting_.use_jit_else_compile) {
+        jit_ = exit_on_error_(OrcJitEngine::create());
+    }
 
     initialize_llvm_elements();
 }
@@ -494,37 +558,57 @@ void CodeGenerator::codegen(std::vector<ASTNodePtr>&& ast_tree) {
             [&](FunctionNode& f) {
                 bool is_top = f.prototype->name == "__anon_expr";
                 if (is_top) {
-                    if (auto ir = codegen(f)) {
-                        auto rt = jit_->get_main_jit_dylib().createResourceTracker();
-                        auto tsm = llvm::orc::ThreadSafeModule(
-                            std::move(module_),
-                          std::move(context_)
-                        );
-                        exit_on_error_(jit_->add_module(std::move(tsm), rt));
-                        initialize_llvm_elements();
+                    if (setting_.use_jit_else_compile) {
+                        if (auto ir = codegen(f)) {
+                            auto rt = jit_->get_main_jit_dylib().createResourceTracker();
+                            auto tsm = llvm::orc::ThreadSafeModule(
+                                std::move(module_),
+                            std::move(context_)
+                            );
+                            exit_on_error_(jit_->add_module(std::move(tsm), rt));
+                            initialize_llvm_elements();
 
-                        auto expr_symbol = exit_on_error_(jit_->lookup("__anon_expr"));
-                        auto address = expr_symbol.getAddress();
-                        auto fp = llvm::jitTargetAddressToPointer<double (*)()>(address);
-                        
-                        output_stream_ << std::to_string(fp()) << '\n';
-                        exit_on_error_(rt->remove());
+                            auto expr_symbol = exit_on_error_(jit_->lookup("__anon_expr"));
+                            auto address = expr_symbol.getAddress();
+                            auto fp = llvm::jitTargetAddressToPointer<double (*)()>(address);
+                            
+                            output_stream_ << std::to_string(fp()) << '\n';
+                            exit_on_error_(rt->remove());
+                        } else {
+                            output_stream_ << err_ << '\n';
+                        }
                     } else {
-                        output_stream_ << err_ << '\n';
+                        if (auto ir = codegen(f)) {
+
+                        } else {
+                            output_stream_ << err_ << '\n';
+                        }
                     }
                 } else {
-                    if (auto ir = codegen(f)) {
-                        if (setting_.print_ir) {
-                            ir->print(output_stream_);
+                    if (setting_.use_jit_else_compile) {
+                        if (auto ir = codegen(f)) {
+                            if (setting_.print_ir) {
+                                ir->print(output_stream_);
+                            } else {
+                                output_stream_ << "parsed definition.\n";
+                            }
+                            exit_on_error_(jit_->add_module(
+                                llvm::orc::ThreadSafeModule(std::move(module_),std::move(context_))
+                            ));
+                            initialize_llvm_elements();
                         } else {
-                            output_stream_ << "parsed definition.\n";
+                            output_stream_ << err_ << '\n';
                         }
-                        exit_on_error_(jit_->add_module(
-                            llvm::orc::ThreadSafeModule(std::move(module_),std::move(context_))
-                        ));
-                        initialize_llvm_elements();
                     } else {
-                        output_stream_ << err_ << '\n';
+                        if (auto ir = codegen(f)) {
+                            if (setting_.print_ir) {
+                                ir->print(output_stream_);
+                            }/*  else {
+                                output_stream_ << "parsed definition.\n";
+                            } */
+                        } else {
+                            output_stream_ << err_ << '\n';
+                        }                        
                     }
                 }
             }
