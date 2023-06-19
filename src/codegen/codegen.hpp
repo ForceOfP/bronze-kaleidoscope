@@ -23,7 +23,7 @@ struct CodeGeneratorSetting {
 
 class CodeGenerator {
 public:
-    explicit CodeGenerator(llvm::raw_ostream&, bool);
+    explicit CodeGenerator(llvm::raw_ostream& os, bool use_jit);
 
     llvm::Value* codegen(std::unique_ptr<VarExpr> e);
     llvm::Value* codegen(std::unique_ptr<UnaryExpr> e);

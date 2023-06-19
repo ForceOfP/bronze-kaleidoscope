@@ -26,6 +26,11 @@ std::vector<Token> Lexer::tokenize(std::string target_) {
     size_t start = 0;
 
     while (start < target.size()) {
+        while (target[start] == ' ' || target[start] == '\t' || target[start] == '\n') {
+            start++;
+        }   
+        if (start == target.size()) break;
+
         if (!token_regex.Match(target, start, target.size(), RE2::ANCHOR_START,
                                 matched_tokens.data(), matched_tokens.size())) {
             std::cerr << "Failed to lex input at dis: " << start << std::endl;
@@ -82,9 +87,6 @@ std::vector<Token> Lexer::tokenize(std::string target_) {
                 }
             }
         }
-        if (target[start] == ' ' || target[start] == '\t') {
-            start++;
-        }        
     }
 
     ans.emplace_back(TokenType::Eof);

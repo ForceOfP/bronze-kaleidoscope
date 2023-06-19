@@ -579,7 +579,7 @@ void CodeGenerator::codegen(std::vector<ASTNodePtr>&& ast_tree) {
                         }
                     } else {
                         if (auto ir = codegen(f)) {
-
+                            ir->print(output_stream_);
                         } else {
                             output_stream_ << err_ << '\n';
                         }
