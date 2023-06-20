@@ -1,5 +1,6 @@
 #include "codegen.hpp"
 
+#include <llvm/IR/Type.h>
 #include <llvm/ADT/Optional.h>
 #include <llvm/IR/Instructions.h>
 #include <llvm/IR/LegacyPassManager.h>
@@ -387,24 +388,32 @@ llvm::Value* CodeGenerator::codegen(std::unique_ptr<BinaryExpr> e) {
         return nullptr;
     }
 
-    if (e->oper == "+") {
-        return builder_->CreateFAdd(l, r, "addtmp");
-    }
-    if (e->oper == "-") {
-        return builder_->CreateFSub(l, r, "subtmp");
-    }
-    if (e->oper == "*") {
-        return builder_->CreateFMul(l, r, "multmp");
-    }
-    if (e->oper == "<") {
-        l = builder_->CreateFCmpULT(l, r);
-        return builder_->CreateUIToFP(l, llvm::Type::getDoubleTy(*context_), "booltmp");
+    auto type = r->getType();
+    if (type != l->getType()) {
+        err_ = "binary operator with two different type";
+        return nullptr;
     }
 
-    llvm::Function* f = get_function(e->oper);
-    assert(f && "binary operator not found!");
-    llvm::Value* ops[2] = {l, r};
-    return builder_->CreateCall(f, ops, "binop");
+    if (setting_.use_jit_else_compile) {
+        if (operator_function_manager_.exist(type, e->oper)) {
+            auto f = operator_function_manager_.get_function(r->getType(), e->oper);
+            return f(builder_.get(), l, r);
+        }
+        llvm::Function* f = get_function(e->oper);
+        assert(f && "binary operator not found!");
+        llvm::Value* ops[2] = {l, r};
+        return builder_->CreateCall(f, ops, "binop");
+    } else {
+        if (!operator_function_manager_.exist(type, e->oper)) {
+            llvm::Function* function_value = get_function(e->oper);
+            assert(function_value && "binary operator not found!");
+            sleep(1);
+            operator_function_manager_.add_function(type, e->oper, function_value);
+        }
+
+        auto f = operator_function_manager_.get_function(type, e->oper);
+        return f(builder_.get(), l, r);
+    }
 }
 
 llvm::Value* CodeGenerator::codegen(std::unique_ptr<VariableExpr> e) {
@@ -628,6 +637,7 @@ llvm::Function* CodeGenerator::get_function(std::string& name) {
         return ans;
     }
 
+    output_stream_ << "not find function!\n";
     return nullptr;
 }
 

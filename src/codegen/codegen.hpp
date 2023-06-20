@@ -11,8 +11,10 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <unordered_map>
 
 #include "ast/ast.hpp"
+#include "operator_function.hpp"
 #include "jit_engine.hpp"
 
 struct CodeGeneratorSetting {
@@ -66,5 +68,7 @@ private:
     std::string err_;
     llvm::ExitOnError exit_on_error_;
     llvm::raw_ostream& output_stream_;
+
+    OperatorFunctionManager operator_function_manager_;
 };
 

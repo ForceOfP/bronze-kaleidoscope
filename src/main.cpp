@@ -80,7 +80,7 @@ void driver(Stage stage) {
 }
 
 int main(int argv, char** args) {
-    auto state = Stage::FileIO;
+    auto state = Stage::Target;
 
     if (state == Stage::FileIO) {
         //auto file_input = args[1];
