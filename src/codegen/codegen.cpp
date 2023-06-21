@@ -120,6 +120,8 @@ llvm::Value* CodeGenerator::codegen(std::unique_ptr<VarExpr> e) {
     std::vector<llvm::AllocaInst*> old_bindings_{};
     llvm::Function* function = builder_->GetInsertBlock()->getParent();
 
+    symbol_table_.step();
+
     // Register all variables and emit their initializer.
     for (auto i = 0; i < e->var_names.size(); i++) {
         const std::string& var_name = e->var_names[i].first;
@@ -144,10 +146,8 @@ llvm::Value* CodeGenerator::codegen(std::unique_ptr<VarExpr> e) {
         builder_->CreateStore(init_value, alloca);
 
         // Remember the old variable binding so that we can restore the binding when
-        // we unrecurse.
-        old_bindings_.push_back(named_values_alloca_[var_name]);
-
-        named_values_alloca_[var_name] = alloca;
+        // we unrecurse.        
+        symbol_table_.add_local(var_name, alloca);
     }
 
     // Codegen the body, now that all vars are in scope.
@@ -157,9 +157,7 @@ llvm::Value* CodeGenerator::codegen(std::unique_ptr<VarExpr> e) {
     }
 
     // Pop all our variables from scope.
-    for (auto i = 0; i < e->var_names.size(); i++) {
-        named_values_alloca_[e->var_names[i].first] = old_bindings_[i];
-    }
+    symbol_table_.back();
 
     // Return the body computation.
     return body_val;
@@ -217,8 +215,8 @@ llvm::Value* CodeGenerator::codegen(std::unique_ptr<ForExpr> e) {
 
     // Within the loop, the variable is defined equal to the PHI node.  If it
     // shadows an existing variable, we have to restore it, so save it now.
-    auto old = named_values_alloca_[e->var_name];
-    named_values_alloca_[e->var_name] = alloca;
+    symbol_table_.step();
+    symbol_table_.add_local(e->var_name, alloca);
 
     // Emit the body of the loop.  This, like any other expr, can change the
     // current BB.  Note that we ignore the value computed by the body, but don't
@@ -259,11 +257,7 @@ llvm::Value* CodeGenerator::codegen(std::unique_ptr<ForExpr> e) {
     builder_->SetInsertPoint(after_block);
 
     // phi->addIncoming(next_var, loop_end_block);
-    if (old) {
-        named_values_alloca_[e->var_name] = old;
-    } else {
-        named_values_alloca_.erase(e->var_name);
-    }
+    symbol_table_.back();
 
     // for expr always returns 0.0.
     return llvm::Constant::getNullValue(llvm::Type::getDoubleTy(*context_));
@@ -361,7 +355,7 @@ llvm::Value* CodeGenerator::codegen(std::unique_ptr<BinaryExpr> e) {
             return nullptr;
         }
 
-        llvm::Value* lhs_value_alloca = named_values_alloca_[lhse->name]; 
+        llvm::Value* lhs_value_alloca = symbol_table_.find(lhse->name);
         if (!lhs_value_alloca) {
             err_ = "Unknown variable name";
             return nullptr;
@@ -395,7 +389,8 @@ llvm::Value* CodeGenerator::codegen(std::unique_ptr<BinaryExpr> e) {
 }
 
 llvm::Value* CodeGenerator::codegen(std::unique_ptr<VariableExpr> e) {
-    auto a = named_values_alloca_[e->name];
+    auto target = symbol_table_.find(e->name);
+    auto a = static_cast<llvm::AllocaInst*>(target);
     if (!a) {
         err_ = "Unknown variable name";
         return nullptr;
@@ -496,7 +491,8 @@ llvm::Function* CodeGenerator::codegen(FunctionNode& f) {
     builder_->SetInsertPoint(basic_block);
 
     // Record the function arguments in the NamedValues map.
-    named_values_alloca_.clear();
+    // named_values_alloca_.clear();
+    symbol_table_.step();
     for (auto& arg: function->args()) {
         // Create an alloca for this variable.
         auto alloca = create_entry_block_alloca(function, std::string(arg.getName()));
@@ -504,7 +500,7 @@ llvm::Function* CodeGenerator::codegen(FunctionNode& f) {
         // Store the initial value into the alloca.
         builder_->CreateStore(&arg, alloca);
 
-        named_values_alloca_.insert({std::string(arg.getName()), alloca});
+        symbol_table_.add_local(std::string(arg.getName()), alloca);
     }
 
     if (llvm::Value* return_value = codegen(std::move(f.body))) {

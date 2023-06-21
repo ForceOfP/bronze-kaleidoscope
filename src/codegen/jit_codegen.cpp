@@ -98,7 +98,8 @@ llvm::Value* JitCodeGenerator::codegen(std::unique_ptr<BinaryExpr> e) {
             return nullptr;
         }
 
-        llvm::Value* lhs_value_alloca = named_values_alloca_[lhse->name]; 
+        llvm::Value* lhs_value_alloca = symbol_table_.find(lhse->name); 
+        
         if (!lhs_value_alloca) {
             err_ = "Unknown variable name";
             return nullptr;

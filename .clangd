@@ -8,7 +8,7 @@ Diagnostics:
   # Tweak Clang-Tidy checks.
   ClangTidy:
     Add: [performance*, modernize*, google*, bugprone*]
-    Remove: [modernize-use-trailing-return-type, bugprone-easily-swappable-parameters]
+    Remove: [modernize-use-trailing-return-type, bugprone-easily-swappable-parameters, modernize-loop-convert]
     CheckOptions:
       readability-identifier-naming.VariableCase: CamelCase
 ---
