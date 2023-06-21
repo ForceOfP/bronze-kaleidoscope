@@ -20,27 +20,28 @@
 struct CodeGeneratorSetting {
     bool print_ir = true;
     bool function_pass_optimize = true;
-    bool use_jit_else_compile = false;
+    //bool use_jit_else_compile = false;
 };
 
 class CodeGenerator {
 public:
-    explicit CodeGenerator(llvm::raw_ostream& os, bool use_jit);
+    explicit CodeGenerator(llvm::raw_ostream& os, bool init = true);
+    virtual ~CodeGenerator() = default;
 
     llvm::Value* codegen(std::unique_ptr<VarExpr> e);
     llvm::Value* codegen(std::unique_ptr<UnaryExpr> e);
     llvm::Value* codegen(std::unique_ptr<ForExpr> e);
     llvm::Value* codegen(std::unique_ptr<IfExpr> e);
     llvm::Value* codegen(std::unique_ptr<CallExpr> e);
-    llvm::Value* codegen(std::unique_ptr<BinaryExpr> e);
     llvm::Value* codegen(std::unique_ptr<VariableExpr> e);
     llvm::Value* codegen(std::unique_ptr<LiteralExpr> e);
     llvm::Value* codegen(std::unique_ptr<Expression> e);
+    virtual llvm::Value* codegen(std::unique_ptr<BinaryExpr> e);
 
     llvm::Function* codegen(ProtoTypePtr p);
     llvm::Function* codegen(FunctionNode& f);
 
-    void codegen(std::vector<ASTNodePtr>&&);
+    virtual void codegen(std::vector<ASTNodePtr>&&);
     void print(std::string&& file_addr);
 public:
     std::map<std::string, int> binary_oper_precedence_ = {
@@ -51,16 +52,16 @@ public:
         {"*", 40}
     };
     CodeGeneratorSetting setting_;
-private:
-    void initialize_llvm_elements();
+protected:
+    // virtual void initialize_llvm_elements();
     llvm::Function* get_function(std::string& name);
     llvm::AllocaInst* create_entry_block_alloca(llvm::Function* function, const std::string& var_name);
-private:
+protected:
     std::unique_ptr<llvm::LLVMContext> context_;
     std::unique_ptr<llvm::IRBuilder<>> builder_;
     std::unique_ptr<llvm::Module> module_;
     std::unique_ptr<llvm::legacy::FunctionPassManager> function_pass_manager_;
-    std::unique_ptr<OrcJitEngine> jit_;
+    //std::unique_ptr<OrcJitEngine> jit_;
 
     //std::map<std::string, llvm::Value*> named_values_;
     std::map<std::string, llvm::AllocaInst*> named_values_alloca_;

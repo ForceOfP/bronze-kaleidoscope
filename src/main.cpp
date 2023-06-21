@@ -2,7 +2,9 @@
 #include "ast/parser.hpp"
 #include "ast/token.hpp"
 #include "codegen/codegen.hpp"
+#include "codegen/jit_codegen.hpp"
 #include <cassert>
+#include <cstdlib>
 #include <fstream>
 #include <llvm-15/llvm/Support/raw_ostream.h>
 #include <llvm-c/Target.h>
@@ -22,7 +24,7 @@ void file_driver(std::string&& file_input, std::string&& file_output) {
         cout << "Could not open file: " << ec.message() << '\n';\
         exit(1);
     }
-    auto generator = CodeGenerator(output, false);
+    auto generator = CodeGenerator(output);
 
     std::ifstream ifs(file_input);
     std::string line;
@@ -39,7 +41,13 @@ void file_driver(std::string&& file_input, std::string&& file_output) {
 
 void driver(Stage stage) {
     string input;
-    auto generator = CodeGenerator(llvm::errs(), stage != Stage::Target); 
+    CodeGenerator* generator = nullptr;
+    if (stage == Stage::Target) {
+        generator = new CodeGenerator(llvm::errs());
+    } else {
+        generator = new JitCodeGenerator(llvm::errs());
+    }
+    //auto generator = CodeGenerator(llvm::errs(), stage != Stage::Target); 
     for (;;) {
         cout << "ready> ";
         cout.flush();
@@ -60,7 +68,7 @@ void driver(Stage stage) {
             } 
             tokens.emplace_back(TokenType::Eof);
 
-            auto parser = Parser(std::move(tokens), generator.binary_oper_precedence_);
+            auto parser = Parser(std::move(tokens), generator->binary_oper_precedence_);
             auto asts = parser.parse();
             if (stage == Stage::Parser) {
                 for (auto& ast: asts) {
@@ -68,15 +76,17 @@ void driver(Stage stage) {
                 }
             }
 
-            generator.codegen(std::move(asts));
+            generator->codegen(std::move(asts));
 
             break;
         }
     }
 
     if (stage == Stage::Target) {
-        generator.print("./target/output.o");
+        generator->print("./target/output.o");
     }
+
+    delete(generator);
 }
 
 int main(int argv, char** args) {

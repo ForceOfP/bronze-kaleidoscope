@@ -1,10 +1,7 @@
 #include "codegen.hpp"
+#include "extern.hpp"
 
-#include <llvm/IR/Type.h>
 #include <llvm/ADT/Optional.h>
-#include <llvm/IR/Instructions.h>
-#include <llvm/IR/LegacyPassManager.h>
-#include <llvm/IR/Value.h>
 #include <llvm/Support/CodeGen.h>
 #include <llvm/Support/FileSystem.h>
 #include <llvm/Support/raw_ostream.h>
@@ -91,35 +88,24 @@ void CodeGenerator::print(std::string&& file_addr) {
     output_stream_ << "Wrote " << file_addr << "\n";
 }
 
-void CodeGenerator::initialize_llvm_elements() {
-    context_ = std::make_unique<llvm::LLVMContext>();
-    module_ = std::make_unique<llvm::Module>("my cool jit", *context_);
-    if (setting_.use_jit_else_compile) {
-        module_->setDataLayout(jit_->get_data_layout());
+CodeGenerator::CodeGenerator(llvm::raw_ostream& os, bool init): output_stream_(os) {
+    if (init) {
+        context_ = std::make_unique<llvm::LLVMContext>();
+        module_ = std::make_unique<llvm::Module>("my cool compiler", *context_);
+
+        builder_ = std::make_unique<llvm::IRBuilder<>>(*context_);    
+        if (setting_.function_pass_optimize) {
+            function_pass_manager_ = std::make_unique<llvm::legacy::FunctionPassManager>(module_.get());
+
+            function_pass_manager_->add(llvm::createPromoteMemoryToRegisterPass());
+            function_pass_manager_->add(llvm::createInstructionCombiningPass());
+            function_pass_manager_->add(llvm::createReassociatePass());
+            function_pass_manager_->add(llvm::createGVNPass());
+            function_pass_manager_->add(llvm::createCFGSimplificationPass());
+        
+            function_pass_manager_->doInitialization();
+        }
     }
-
-    builder_ = std::make_unique<llvm::IRBuilder<>>(*context_);    
-    if (setting_.function_pass_optimize) {
-        function_pass_manager_ = std::make_unique<llvm::legacy::FunctionPassManager>(module_.get());
-
-        function_pass_manager_->add(llvm::createPromoteMemoryToRegisterPass());
-        function_pass_manager_->add(llvm::createInstructionCombiningPass());
-        function_pass_manager_->add(llvm::createReassociatePass());
-        function_pass_manager_->add(llvm::createGVNPass());
-        function_pass_manager_->add(llvm::createCFGSimplificationPass());
-    
-        function_pass_manager_->doInitialization();
-    }
-}
-
-CodeGenerator::CodeGenerator(llvm::raw_ostream& os, bool use_jit): output_stream_(os) {
-    setting_.use_jit_else_compile = use_jit;
-    exit_on_error_ = llvm::ExitOnError();
-    if (setting_.use_jit_else_compile) {
-        jit_ = exit_on_error_(OrcJitEngine::create());
-    }
-
-    initialize_llvm_elements();
 }
 
 llvm::AllocaInst* CodeGenerator::create_entry_block_alloca(llvm::Function* function, const std::string& var_name) {
@@ -394,26 +380,15 @@ llvm::Value* CodeGenerator::codegen(std::unique_ptr<BinaryExpr> e) {
         return nullptr;
     }
 
-    if (setting_.use_jit_else_compile) {
-        if (operator_function_manager_.exist(type, e->oper)) {
-            auto f = operator_function_manager_.get_function(r->getType(), e->oper);
-            return f(builder_.get(), l, r);
-        }
-        llvm::Function* f = get_function(e->oper);
-        assert(f && "binary operator not found!");
-        llvm::Value* ops[2] = {l, r};
-        return builder_->CreateCall(f, ops, "binop");
-    } else {
-        if (!operator_function_manager_.exist(type, e->oper)) {
-            llvm::Function* function_value = get_function(e->oper);
-            assert(function_value && "binary operator not found!");
-            sleep(1);
-            operator_function_manager_.add_function(type, e->oper, function_value);
-        }
-
-        auto f = operator_function_manager_.get_function(type, e->oper);
-        return f(builder_.get(), l, r);
+    if (!operator_function_manager_.exist(type, e->oper)) {
+        llvm::Function* function_value = get_function(e->oper);
+        assert(function_value && "binary operator not found!");
+        sleep(1);
+        operator_function_manager_.add_function(type, e->oper, function_value);
     }
+
+    auto f = operator_function_manager_.get_function(type, e->oper);
+    return f(builder_.get(), l, r);
 }
 
 llvm::Value* CodeGenerator::codegen(std::unique_ptr<VariableExpr> e) {
@@ -423,7 +398,6 @@ llvm::Value* CodeGenerator::codegen(std::unique_ptr<VariableExpr> e) {
         return nullptr;
     }
     return builder_->CreateLoad(a->getAllocatedType(), a, e->name.c_str());
-    // return named_values_[e->name];
 }
 
 llvm::Value* CodeGenerator::codegen(std::unique_ptr<LiteralExpr> e) {
@@ -515,10 +489,6 @@ llvm::Function* CodeGenerator::codegen(FunctionNode& f) {
         return nullptr;
     }
 
-/*     if (f.prototype->is_binary_oper()) {
-        binary_oper_precedence_[f.prototype->get_operator_name()] = f.prototype->get_binary_precedence();
-    } */
-
     llvm::BasicBlock* basic_block = llvm::BasicBlock::Create(*context_, "entry", function);
     builder_->SetInsertPoint(basic_block);
 
@@ -567,58 +537,21 @@ void CodeGenerator::codegen(std::vector<ASTNodePtr>&& ast_tree) {
             [&](FunctionNode& f) {
                 bool is_top = f.prototype->name == "__anon_expr";
                 if (is_top) {
-                    if (setting_.use_jit_else_compile) {
-                        if (auto ir = codegen(f)) {
-                            auto rt = jit_->get_main_jit_dylib().createResourceTracker();
-                            auto tsm = llvm::orc::ThreadSafeModule(
-                                std::move(module_),
-                            std::move(context_)
-                            );
-                            exit_on_error_(jit_->add_module(std::move(tsm), rt));
-                            initialize_llvm_elements();
-
-                            auto expr_symbol = exit_on_error_(jit_->lookup("__anon_expr"));
-                            auto address = expr_symbol.getAddress();
-                            auto fp = llvm::jitTargetAddressToPointer<double (*)()>(address);
-                            
-                            output_stream_ << std::to_string(fp()) << '\n';
-                            exit_on_error_(rt->remove());
-                        } else {
-                            output_stream_ << err_ << '\n';
-                        }
+                    if (auto ir = codegen(f)) {
+                        ir->print(output_stream_);
                     } else {
-                        if (auto ir = codegen(f)) {
-                            ir->print(output_stream_);
-                        } else {
-                            output_stream_ << err_ << '\n';
-                        }
+                        output_stream_ << err_ << '\n';
                     }
                 } else {
-                    if (setting_.use_jit_else_compile) {
-                        if (auto ir = codegen(f)) {
-                            if (setting_.print_ir) {
-                                ir->print(output_stream_);
-                            } else {
-                                output_stream_ << "parsed definition.\n";
-                            }
-                            exit_on_error_(jit_->add_module(
-                                llvm::orc::ThreadSafeModule(std::move(module_),std::move(context_))
-                            ));
-                            initialize_llvm_elements();
-                        } else {
-                            output_stream_ << err_ << '\n';
-                        }
+                    if (auto ir = codegen(f)) {
+                        if (setting_.print_ir) {
+                            ir->print(output_stream_);
+                        }/*  else {
+                            output_stream_ << "parsed definition.\n";
+                        } */
                     } else {
-                        if (auto ir = codegen(f)) {
-                            if (setting_.print_ir) {
-                                ir->print(output_stream_);
-                            }/*  else {
-                                output_stream_ << "parsed definition.\n";
-                            } */
-                        } else {
-                            output_stream_ << err_ << '\n';
-                        }                        
-                    }
+                        output_stream_ << err_ << '\n';
+                    }                        
                 }
             }
         );
@@ -639,23 +572,4 @@ llvm::Function* CodeGenerator::get_function(std::string& name) {
 
     output_stream_ << "not find function!\n";
     return nullptr;
-}
-
-
-#ifdef _WIN32
-#define DLLEXPORT __declspec(dllexport)
-#else
-#define DLLEXPORT
-#endif
-
-/// putchard - putchar that takes a double and returns 0.
-extern "C" DLLEXPORT double putchard(double X) {
-    fputc((char)X, stderr);
-    return 0;
-}
-
-/// printd - printf that takes a double prints it as "%f\n", returning 0.
-extern "C" DLLEXPORT double printd(double X) {
-    fprintf(stderr, "%f\n", X);
-    return 0;
 }

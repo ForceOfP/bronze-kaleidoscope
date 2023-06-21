@@ -7,12 +7,12 @@
 #include "ast/ast.hpp"
 #include "ast/lexer.hpp"
 #include "ast/parser.hpp"
-#include "codegen/codegen.hpp"
+#include "codegen/jit_codegen.hpp"
 
 void codegen_helper(std::vector<std::string>& target, std::vector<std::string>& answer) {
     std::string ans = "";
     llvm::raw_string_ostream output(ans); 
-    auto generator = CodeGenerator(output, true);
+    auto generator = JitCodeGenerator(output);
     generator.setting_.print_ir = false;
     for (int i = 0; i < target.size(); i++) {
         auto parser = Parser(Lexer::tokenize(target[i]), generator.binary_oper_precedence_);
