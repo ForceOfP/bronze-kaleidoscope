@@ -88,7 +88,10 @@ void CodeGenerator::print(std::string&& file_addr) {
     output_stream_ << "Wrote " << file_addr << "\n";
 }
 
-CodeGenerator::CodeGenerator(llvm::raw_ostream& os, bool init): output_stream_(os) {
+CodeGenerator::CodeGenerator(llvm::raw_ostream& os, CodeGeneratorSetting setting, bool init): output_stream_(os) {
+    setting_.function_pass_optimize = setting.function_pass_optimize;
+    setting_.print_ir = setting.print_ir;
+    
     if (init) {
         context_ = std::make_unique<llvm::LLVMContext>();
         module_ = std::make_unique<llvm::Module>("my cool compiler", *context_);

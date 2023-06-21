@@ -20,12 +20,11 @@
 struct CodeGeneratorSetting {
     bool print_ir = true;
     bool function_pass_optimize = true;
-    //bool use_jit_else_compile = false;
 };
 
 class CodeGenerator {
 public:
-    explicit CodeGenerator(llvm::raw_ostream& os, bool init = true);
+    explicit CodeGenerator(llvm::raw_ostream& os, CodeGeneratorSetting setting, bool init = true);
     virtual ~CodeGenerator() = default;
 
     llvm::Value* codegen(std::unique_ptr<VarExpr> e);

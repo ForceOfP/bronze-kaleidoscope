@@ -24,7 +24,12 @@ void file_driver(std::string&& file_input, std::string&& file_output) {
         cout << "Could not open file: " << ec.message() << '\n';\
         exit(1);
     }
-    auto generator = CodeGenerator(output);
+    CodeGeneratorSetting setting = {
+        .print_ir = true,
+        .function_pass_optimize = true,
+    };
+
+    auto generator = CodeGenerator(output, setting);
 
     std::ifstream ifs(file_input);
     std::string line;
@@ -42,10 +47,15 @@ void file_driver(std::string&& file_input, std::string&& file_output) {
 void driver(Stage stage) {
     string input;
     CodeGenerator* generator = nullptr;
+    CodeGeneratorSetting setting = {
+        .print_ir = true,
+        .function_pass_optimize = true,
+    };
+
     if (stage == Stage::Target) {
-        generator = new CodeGenerator(llvm::errs());
+        generator = new CodeGenerator(llvm::errs(), setting);
     } else {
-        generator = new JitCodeGenerator(llvm::errs());
+        generator = new JitCodeGenerator(llvm::errs(), setting);
     }
     //auto generator = CodeGenerator(llvm::errs(), stage != Stage::Target); 
     for (;;) {
@@ -93,7 +103,6 @@ int main(int argv, char** args) {
     auto state = Stage::Target;
 
     if (state == Stage::FileIO) {
-        //auto file_input = args[1];
         assert(argv == 3);
         file_driver(args[1], args[2]);
         return 0;

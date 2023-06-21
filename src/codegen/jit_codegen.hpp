@@ -9,7 +9,7 @@
 
 class JitCodeGenerator: public CodeGenerator {
 public:
-    explicit JitCodeGenerator(llvm::raw_ostream& os);
+    explicit JitCodeGenerator(llvm::raw_ostream& os, CodeGeneratorSetting setting);
 
     void codegen(std::vector<ASTNodePtr>&& ast_tree) override;
     llvm::Value* codegen(std::unique_ptr<BinaryExpr> e) override;

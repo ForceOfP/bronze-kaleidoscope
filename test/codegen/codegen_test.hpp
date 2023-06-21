@@ -12,8 +12,11 @@
 void codegen_helper(std::vector<std::string>& target, std::vector<std::string>& answer) {
     std::string ans = "";
     llvm::raw_string_ostream output(ans); 
-    auto generator = JitCodeGenerator(output);
-    generator.setting_.print_ir = false;
+    CodeGeneratorSetting setting = {
+        .print_ir = false,
+        .function_pass_optimize = true,
+    };
+    auto generator = JitCodeGenerator(output, setting);
     for (int i = 0; i < target.size(); i++) {
         auto parser = Parser(Lexer::tokenize(target[i]), generator.binary_oper_precedence_);
         auto asts = parser.parse();

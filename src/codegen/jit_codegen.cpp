@@ -5,7 +5,7 @@
 #include <llvm/Transforms/Scalar/GVN.h>
 #include <llvm/Transforms/Utils.h>
 
-JitCodeGenerator::JitCodeGenerator(llvm::raw_ostream& os): CodeGenerator(os, false) {
+JitCodeGenerator::JitCodeGenerator(llvm::raw_ostream& os, CodeGeneratorSetting setting): CodeGenerator(os, setting, false) {
     exit_on_error_ = llvm::ExitOnError();
     jit_ = exit_on_error_(OrcJitEngine::create());
     initialize_llvm_elements();
