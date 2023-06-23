@@ -24,7 +24,7 @@ TEST(AST, tokenize) {
         "2.3",
         "abc",
         "2",
-        ";,()+-*=",
+        "; , ( ) + - * = += ==",
         "extern",
         "def f(x) x + x ###afeabgnan####",
         "for in if else then",
@@ -34,7 +34,7 @@ TEST(AST, tokenize) {
         "[Literal: 2.3]",
         "[Ident: abc]",
         "[Literal: 2]",
-        "[;] [,] [(] [)] [Oper: +] [Oper: -] [Oper: *] [Oper: =]",
+        "[;] [,] [(] [)] [Oper: +] [Oper: -] [Oper: *] [Oper: =] [Oper: +=] [Oper: ==]",
         "[Extern]",
         "[Def] [Ident: f] [(] [Ident: x] [)] [Ident: x] [Oper: +] [Ident: x]",
         "[For] [In] [If] [Else] [Then]"

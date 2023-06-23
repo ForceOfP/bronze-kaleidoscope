@@ -147,17 +147,23 @@ TEST(CODEGEN, oper) {
         "def binary | 5 (LHS, RHS) if LHS then 1 else if RHS then 1 else 0;",
         "0|0",
         "1|0",
-        "def binary & 6 (LHS, RHS) if !LHS then 0 else !!RHS;",
+        "def binary & 6 (LHS, RHS) if !LHS then 0 else !(!RHS);",
         "1&0",
         "1&1",
         "def binary > 10 (LHS, RHS) RHS < LHS;",
         "1 > 2",
         "2 > 1",
+        "def binary == 9 (LHS, RHS) !(RHS < LHS | RHS > LHS);",
+        "1 == 0",
+        "1 == 1",
     };
 
     std::vector<std::string> answer = {
 /*         "parsed definition.\n",
         "-5.000000\n", */
+        "parsed definition.\n",
+        "0.000000\n",
+        "1.000000\n",
         "parsed definition.\n",
         "0.000000\n",
         "1.000000\n",

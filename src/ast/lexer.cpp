@@ -16,8 +16,7 @@ std::vector<Token> Lexer::tokenize(std::string target_) {
         "(?P<oppar>\\()|"
         "(?P<clpar>\\))|"
         "(?P<comma>,)|"
-        //"(?P<operator>[\\+|\\-|\\*|\\=])"
-        "(?P<operator>[[:graph:]])"
+        "(?P<operator>[!-'*-/:<-@\\^`|~][!-'*-/:<-@\\^`|~]?)"
     );
 
     std::vector<re2::StringPiece> matched_tokens(token_regex.NumberOfCapturingGroups() + 1);
