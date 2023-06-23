@@ -21,12 +21,12 @@ std::string serialize_asts(std::vector<ASTNodePtr>& asts) {
 
 TEST(AST, parse) {
     const std::vector<std::string> target = {
-        "def f(x) x + x",
+        "def f(x) { x + x }",
         "2.3",
         "extern sin(x)",
-        "if 1 then 2 else 3;",
-        "for i = 0, i < n, 1.0 in 1;",
-        "for i = 0, i < n in 1;"
+        "if (1) {2} else {3};",
+        "for (i = 0, i < n, 1.0) {1};",
+        "for (i = 0, i < n) {1};"
     };
 
     const std::vector<std::string> answer = {

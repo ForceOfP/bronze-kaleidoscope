@@ -14,6 +14,8 @@ enum class TokenType {
     Delimiter, //';'
     LeftParenthesis, // '('
     RightParenthesis, // ')'
+    LeftCurlyBrackets, // '{'
+    RightCurlyBrackets, // '}'
     Comma, // ','
     Identifier, // with a string
     Literal, // with a double
@@ -79,6 +81,10 @@ public:
             os << "[Unary]"; break;
         case TokenType::Var:
             os << "[Var]"; break;
+        case TokenType::LeftCurlyBrackets:
+            os << "[{]"; break;
+        case TokenType::RightCurlyBrackets:
+            os << "[}]"; break;
         default:
             break;
         }

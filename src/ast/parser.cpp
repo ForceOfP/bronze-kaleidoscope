@@ -52,7 +52,7 @@ void Parser::parse_top_level_expression() {
     ast_tree_.push_back(std::make_unique<ASTNode>(FunctionNode{std::move(proto), std::move(expression)}));
 }
 
-/// definition ::= 'def' prototype expression
+/// definition ::= 'def' prototype { expression }
 void Parser::parse_definition() {
     next_token(); //eat def
     auto proto = parse_prototype();
@@ -60,11 +60,22 @@ void Parser::parse_definition() {
         return;
     }
 
+    if (current_token_type() != TokenType::LeftCurlyBrackets) {
+        err_ = "expected '{' before prototype";
+        return;
+    }
+    next_token(); // eat {
+
     auto expression = parse_expression();
     if (!expression) {
         return;
     }
 
+    if (current_token_type() != TokenType::RightCurlyBrackets) {
+        err_ = "expected '}' before prototype";
+        return;
+    }
+    next_token(); // eat }
     // std::cout << "Parsed a function definition." << std::endl;
 
     ast_tree_.push_back(std::make_unique<ASTNode>(FunctionNode{std::move(proto), std::move(expression)}));
@@ -287,9 +298,16 @@ ExpressionPtr Parser::parse_var_expr() {
     return std::make_unique<VarExpr>(std::move(names), std::move(body));
 }
 
-/// forexpr ::= 'for' identifier '=' expr ',' expr (',' expr)? 'in' expression
+/// forexpr ::= 'for' '(' identifier '=' expr ',' expr (',' expr)? ')' { expression }
 ExpressionPtr Parser::parse_for_expr() {
     next_token(); // eat for
+
+    if (current_token_type() != TokenType::LeftParenthesis) {
+        err_ = "expected token '(' before if";
+        return nullptr;
+    }
+    next_token(); // eat '('
+
     if (current_token_type() != TokenType::Identifier) {
         err_ = "expected identifier after for";
         return nullptr;
@@ -329,16 +347,29 @@ ExpressionPtr Parser::parse_for_expr() {
         }
     }
 
-    if (current_token_type() != TokenType::In) {
-        err_ = "expected 'in' after for";
+    if (current_token_type() != TokenType::RightParenthesis) {
+        err_ = "expected token ')' before loop-condition";
         return nullptr;
     }
-    next_token(); // eat in
+    next_token(); // eat ')'
+
+    if (current_token_type() != TokenType::LeftCurlyBrackets) {
+        err_ = "expected '{' after for-body";
+        return nullptr;
+    }
+    next_token(); // eat '{'
 
     auto body = parse_expression();
     if (!body) {
         return nullptr;
     }
+
+    if (current_token_type() != TokenType::RightCurlyBrackets) {
+        err_ = "expected '}' before for-body";
+        return nullptr;
+    }
+    next_token(); // eat '}'
+
     return std::make_unique<ForExpr>(
         variant_name,
         std::move(start),
@@ -348,31 +379,61 @@ ExpressionPtr Parser::parse_for_expr() {
     );
 }
 
-/// ifexpr ::= 'if' expression 'then' expression 'else' expression
+/// ifexpr ::= 'if' '(' expression ')' '{' expression '}' ('else' '{' expression '}')?
 ExpressionPtr Parser::parse_if_expr() {
     next_token(); // eat if
+
+    if (current_token_type() != TokenType::LeftParenthesis) {
+        err_ = "expected token '(' before if";
+        return nullptr;
+    }
+    next_token(); // eat '('
 
     //condition
     auto cond = parse_expression();
     if (!cond) return nullptr;
 
-    if (current_token_type() != TokenType::Then) {
-        err_ = "expected token 'then'";
+    if (current_token_type() != TokenType::RightParenthesis) {
+        err_ = "expected token ')'";
         return nullptr;
     }
-    next_token(); // eat then
+    next_token(); // eat ')'
+
+    if (current_token_type() != TokenType::LeftCurlyBrackets) {
+        err_ = "expected token '{'";
+        return nullptr;
+    }
+    next_token(); // eat '{'
 
     auto then = parse_expression();
     if (!then) return nullptr;
 
-    if (current_token_type() != TokenType::Else) {
-        err_ = "expected token 'else'";
-        return nullptr;        
+    if (current_token_type() != TokenType::RightCurlyBrackets) {
+        err_ = "expected token '}'";
+        return nullptr;
     }
+    next_token(); // eat '}'
 
+    if (current_token_type() != TokenType::Else) {
+        return std::make_unique<IfExpr>(std::move(cond), std::move(then), nullptr);
+    }
     next_token(); // eat else
+
+    if (current_token_type() != TokenType::LeftCurlyBrackets) {
+        err_ = "expected token '{'";
+        return nullptr;
+    }
+    next_token(); // eat '{'
+    
     auto _else = parse_expression();
     if (!_else) return nullptr;
+    
+    if (current_token_type() != TokenType::RightCurlyBrackets) {
+        err_ = "expected token '}'";
+        return nullptr;
+    }
+    next_token(); // eat '}'
+
     return std::make_unique<IfExpr>(std::move(cond), std::move(then), std::move(_else));
 }
 

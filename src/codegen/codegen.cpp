@@ -289,6 +289,17 @@ llvm::Value* CodeGenerator::codegen(std::unique_ptr<IfExpr> e) {
     builder_->CreateBr(merge_block);
     then_block = builder_->GetInsertBlock();
 
+    if (!e->_else) {
+        auto& merge_inserting_blocks = function->getBasicBlockList();
+        merge_inserting_blocks.insert(function->end(), merge_block);
+
+        builder_->SetInsertPoint(merge_block);
+        llvm::PHINode* phi = builder_->CreatePHI(llvm::Type::getDoubleTy(*context_), 1, "iftmp");
+
+        phi->addIncoming(then_value, then_block);
+        return phi;
+    }
+
     // llvm implement a function named Function::insert() at llvm17...
     // but I'm using llvm15
     auto& else_inserting_blocks = function->getBasicBlockList();

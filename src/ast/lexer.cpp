@@ -15,6 +15,8 @@ std::vector<Token> Lexer::tokenize(std::string target_) {
         "(?P<delimiter>;)|"
         "(?P<oppar>\\()|"
         "(?P<clpar>\\))|"
+        "(?P<opcur>{)|"
+        "(?P<clcur>})|"
         "(?P<comma>,)|"
         "(?P<operator>[!-'*-/:<-@\\^`|~][!-'*-/:<-@\\^`|~]?)"
     );
@@ -76,6 +78,10 @@ std::vector<Token> Lexer::tokenize(std::string target_) {
                     ans.emplace_back(TokenType::LeftParenthesis);
                 } else if (token_tag == "clpar") {
                     ans.emplace_back(TokenType::RightParenthesis);
+                } else if (token_tag == "opcur") {
+                    ans.emplace_back(TokenType::LeftCurlyBrackets);
+                } else if (token_tag == "clcur") {
+                    ans.emplace_back(TokenType::RightCurlyBrackets);
                 } else if (token_tag == "comma") {
                     ans.emplace_back(TokenType::Comma);
                 } else if (token_tag == "operator") {

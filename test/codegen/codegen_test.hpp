@@ -28,7 +28,7 @@ void codegen_helper(std::vector<std::string>& target, std::vector<std::string>& 
 
 TEST(CODEGEN, single) {
     std::vector<std::string> target = {
-        "def f(x) x + x",
+        "def f(x) { x + x }",
         "extern sin(x)",
         "2 + 3"
     };
@@ -45,9 +45,9 @@ TEST(CODEGEN, single) {
 
 TEST(CODEGEN, optimize) {
     std::vector<std::string> target = {
-        "def g(x) 2 + 3 + x", // TODO(lbt): "x + 2 + 3" will break the constant folding, check what happened.
-        "def h(x, y) x * y + y * x",
-        "def i(x) (1 + 2 + x)*(x + (1 + 2));",
+        "def g(x) { 2 + 3 + x }", // TODO(lbt): "x + 2 + 3" will break the constant folding, check what happened.
+        "def h(x, y) { x * y + y * x }",
+        "def i(x) {(1 + 2 + x)*(x + (1 + 2))};",
     };
 
     std::vector<std::string> answer = {
@@ -62,7 +62,7 @@ TEST(CODEGEN, optimize) {
 
 TEST(CODEGEN, jit) {
     std::vector<std::string> target = {
-        "def f(x, y, z) x * y + z",
+        "def f(x, y, z) {x * y + z}",
         "f(4, 2, 3)",
         "f(1, 2, 3)"
     };
@@ -81,7 +81,7 @@ TEST(CODEGEN, ext) {
     std::vector<std::string> target = {
         "extern sin(x)",
         "extern cos(x)",
-        "def f(x) sin(x) * sin(x) + cos(x) * cos(x)",
+        "def f(x) {sin(x) * sin(x) + cos(x) * cos(x)}",
         "f(1.0)",
         "f(4.0)"
     };
@@ -101,9 +101,9 @@ TEST(CODEGEN, ext) {
 
 TEST(CODEGEN, ifelse) {
     std::vector<std::string> target = {
-        "def double(x) x + x",
-        "def triple(x) x * 3",
-        "def f(x) if x < 3 then double(x) else triple(x);",
+        "def double(x) {x + x}",
+        "def triple(x) {x * 3}",
+        "def f(x) {if (x < 3) {double(x)} else {triple(x)}};",
         "f(2)",
         "f(5)"
     };
@@ -122,8 +122,8 @@ TEST(CODEGEN, ifelse) {
 
 TEST(CODEGEN, loop) {
     std::vector<std::string> target = {
-        "def binary : 1 (x, y) y;",
-        "def sum(n) var a = 0, b = 0 in (for i = 0, i < n in b = a + b : a = a + 1) : b",
+        "def binary : 1 (x, y) {y};",
+        "def sum(n) { var a = 0, b = 0 in (for (i = 0, i < n) {b = a + b : a = a + 1}) : b }",
         "sum(100)",
     };
 
@@ -141,19 +141,19 @@ TEST(CODEGEN, oper) {
     std::vector<std::string> target = {
 /*         "def unary - (v) 0 - v;",
         "-(2+3)", */
-        "def unary ! (v) if v then 0 else 1;",
+        "def unary ! (v) {if (v) {0} else {1}};",
         "!1",
         "!0",
-        "def binary | 5 (LHS, RHS) if LHS then 1 else if RHS then 1 else 0;",
+        "def binary | 5 (LHS, RHS) {if (LHS) {1} else {if (RHS) {1} else {0}}};",
         "0|0",
         "1|0",
-        "def binary & 6 (LHS, RHS) if !LHS then 0 else !(!RHS);",
+        "def binary & 6 (LHS, RHS) {if (!LHS) {0} else {!(!RHS)}};",
         "1&0",
         "1&1",
-        "def binary > 10 (LHS, RHS) RHS < LHS;",
+        "def binary > 10 (LHS, RHS) {RHS < LHS};",
         "1 > 2",
         "2 > 1",
-        "def binary == 9 (LHS, RHS) !(RHS < LHS | RHS > LHS);",
+        "def binary == 9 (LHS, RHS) {!(RHS < LHS | RHS > LHS)};",
         "1 == 0",
         "1 == 1",
     };
@@ -184,8 +184,8 @@ TEST(CODEGEN, oper) {
 
 TEST(CODEGEN, variant) {
     std::vector<std::string> target = {
-        "def binary : 1 (x, y) y;",
-        "def fibi(x) var a = 1, b = 1, c in (for i = 3, i < x in c = a + b : a = b : b = c) : b;",
+        "def binary : 1 (x, y) {y};",
+        "def fibi(x) {var a = 1, b = 1, c in (for (i = 3, i < x) {c = a + b : a = b : b = c}) : b};",
         "fibi(10)",
     };
 
