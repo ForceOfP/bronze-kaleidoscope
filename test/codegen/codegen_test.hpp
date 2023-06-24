@@ -103,7 +103,7 @@ TEST(CODEGEN, ifelse) {
     std::vector<std::string> target = {
         "def double(x) {return x + x;}",
         "def triple(x) {return x * 3;}",
-        "def f(x) {return if (x < 3) {double(x)} else {triple(x)};};",
+        "def f(x) {return if (x < 3) {double(x);} else {triple(x);};};",
         "f(2)",
         "f(5)"
     };
@@ -123,7 +123,7 @@ TEST(CODEGEN, ifelse) {
 TEST(CODEGEN, loop) {
     std::vector<std::string> target = {
         "def binary : 1 (x, y) {return y;};",
-        "def sum(n) {var a = 0, b = 0; for (i = 0, i < n) {b = a + b : a = a + 1}; return b; }",
+        "def sum(n) {var a = 0, b = 0; for (i = 0, i < n) {b = a + b; a = a + 1;}; return b; }",
         "sum(100)",
     };
 
@@ -141,13 +141,13 @@ TEST(CODEGEN, oper) {
     std::vector<std::string> target = {
 /*         "def unary - (v) 0 - v;",
         "-(2+3)", */
-        "def unary ! (v) {return if (v) {0} else {1};};",
+        "def unary ! (v) {return if (v) {0;} else {1;};};",
         "!1",
         "!0",
-        "def binary | 5 (LHS, RHS) {return if (LHS) {1} else {if (RHS) {1} else {0}};};",
+        "def binary | 5 (LHS, RHS) {return if (LHS) {1;} else {if (RHS) {1;} else {0;};};};",
         "0|0",
         "1|0",
-        "def binary & 6 (LHS, RHS) {return if (!LHS) {0} else {!(!RHS)};};",
+        "def binary & 6 (LHS, RHS) {return if (!LHS) {0;} else {!(!RHS);};};",
         "1&0",
         "1&1",
         "def binary > 10 (LHS, RHS) {return RHS < LHS;};",
@@ -185,7 +185,7 @@ TEST(CODEGEN, oper) {
 TEST(CODEGEN, variant) {
     std::vector<std::string> target = {
         "def binary : 1 (x, y) {return y;};",
-        "def fibi(x) {var a = 1, b = 1, c; for (i = 3, i < x) {c = a + b : a = b : b = c}; return b;};",
+        "def fibi(x) {var a = 1, b = 1, c; for (i = 3, i < x) {c = a + b; a = b; b = c;}; return b;};",
         "fibi(10)",
     };
 

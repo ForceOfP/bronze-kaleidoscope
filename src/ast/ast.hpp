@@ -48,15 +48,17 @@ struct CallExpr: public Expression {
 };
 
 struct IfExpr: public Expression {
-    std::unique_ptr<Expression> condition, then, _else;
-    IfExpr(ExpressionPtr c, ExpressionPtr t, ExpressionPtr e): 
+    std::unique_ptr<Expression> condition;
+    Body then, _else;
+    IfExpr(ExpressionPtr c, Body t, Body e = {}): 
         condition(std::move(c)), then(std::move(t)), _else(std::move(e)) {}
 };
 
 struct ForExpr: public Expression {
     std::string var_name;
-    ExpressionPtr start, end, step, body;
-    ForExpr(std::string name, ExpressionPtr s, ExpressionPtr e, ExpressionPtr _step, ExpressionPtr b):
+    ExpressionPtr start, end, step;
+    Body body;
+    ForExpr(std::string name, ExpressionPtr s, ExpressionPtr e, ExpressionPtr _step, Body b):
         var_name(std::move(name)), start(std::move(s)), end(std::move(e)), step(std::move(_step)), body(std::move(b)) {}
 };
 
@@ -70,10 +72,9 @@ struct UnaryExpr: public Expression {
 
 struct VarExpr: public Expression {
     std::vector<std::pair<std::string, ExpressionPtr>> var_names;
-    // ExpressionPtr body;
 
-    VarExpr(std::vector<std::pair<std::string, ExpressionPtr>> vars/* , ExpressionPtr _body */):
-        var_names(std::move(vars))/* , body(std::move(_body)) */ {}
+    explicit VarExpr(std::vector<std::pair<std::string, ExpressionPtr>> vars):
+        var_names(std::move(vars)) {}
 };
 
 struct ReturnExpr: public Expression {

@@ -298,7 +298,7 @@ llvm::Value* CodeGenerator::codegen(std::unique_ptr<IfExpr> e) {
     builder_->CreateBr(merge_block);
     then_block = builder_->GetInsertBlock();
 
-    if (!e->_else) {
+    if (e->_else.empty()) {
         auto& merge_inserting_blocks = function->getBasicBlockList();
         merge_inserting_blocks.insert(function->end(), merge_block);
 
