@@ -28,6 +28,7 @@ enum class TokenType {
     Binary,
     Unary,
     Var,
+    Return,
     Init
 };
 
@@ -85,6 +86,8 @@ public:
             os << "[{]"; break;
         case TokenType::RightCurlyBrackets:
             os << "[}]"; break;
+        case TokenType::Return: 
+            os << "[Return]"; break;
         default:
             break;
         }

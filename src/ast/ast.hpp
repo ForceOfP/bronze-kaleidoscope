@@ -16,6 +16,7 @@ public:
 };
 
 using ExpressionPtr = std::unique_ptr<Expression>;
+using Body = std::vector<ExpressionPtr>;
 
 struct LiteralExpr: public Expression {
     double value;
@@ -75,6 +76,12 @@ struct VarExpr: public Expression {
         var_names(std::move(vars)), body(std::move(_body)) {}
 };
 
+struct ReturnExpr: public Expression {
+    ExpressionPtr ret;
+
+    explicit ReturnExpr(ExpressionPtr _ret): ret(std::move(_ret)) {}  
+};
+
 struct ProtoType {
     std::string name;
     std::vector<std::string> args;
@@ -110,9 +117,10 @@ struct ExternNode {
 
 struct FunctionNode {
     std::unique_ptr<ProtoType> prototype;
-    std::unique_ptr<Expression> body;
+    // std::unique_ptr<Expression> body;
+    Body body;
 
-    FunctionNode(std::unique_ptr<ProtoType> _prototype, std::unique_ptr<Expression> _body):
+    FunctionNode(std::unique_ptr<ProtoType> _prototype, Body _body):
         prototype(std::move(_prototype)), body(std::move(_body)) {}
 
     friend std::ostream& operator<<(std::ostream& os, const FunctionNode& t);

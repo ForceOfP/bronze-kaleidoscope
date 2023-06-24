@@ -102,7 +102,7 @@ void driver(Stage stage) {
 int main(int argv, char** args) {
     auto state = Stage::Target;
 
-    if (state == Stage::FileIO) {
+    if (state == Stage::Codegen) {
         assert(argv == 3);
         file_driver(args[1], args[2]);
         return 0;

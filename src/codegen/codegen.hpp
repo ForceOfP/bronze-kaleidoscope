@@ -1,5 +1,6 @@
 #pragma once
 
+#include <llvm-15/llvm/IR/Value.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/Instructions.h>
@@ -29,6 +30,8 @@ public:
                            bool init = true);
     virtual ~CodeGenerator() = default;
 
+    llvm::Value* codegen(Body b);
+    llvm::Value* codegen(std::unique_ptr<ReturnExpr> e); // todo
     llvm::Value* codegen(std::unique_ptr<VarExpr> e);
     llvm::Value* codegen(std::unique_ptr<UnaryExpr> e);
     llvm::Value* codegen(std::unique_ptr<ForExpr> e);

@@ -21,21 +21,23 @@ std::string serialize_asts(std::vector<ASTNodePtr>& asts) {
 
 TEST(AST, parse) {
     const std::vector<std::string> target = {
-        "def f(x) { x + x }",
+        "def f(x) { return x + x; }",
         "2.3",
         "extern sin(x)",
         "if (1) {2} else {3};",
         "for (i = 0, i < n, 1.0) {1};",
-        "for (i = 0, i < n) {1};"
+        "for (i = 0, i < n) {1};",
+        "def g(x) { return 1; }"
     };
 
     const std::vector<std::string> answer = {
-        "[Function]: \n\t[Name]: f\n\t[Args]: x ",
-        "[Function]: \n\t[Name]: __anon_expr\n",
+        "[Function]: \n\t[Name]: f\n\t[Args]: x \n\t[Body]: \n\t\t[Return]\n",
+        "[Function]: \n\t[Name]: __anon_expr\n\n\t[Body]: \n\t\t[Literal]\n",
         "[Extern]: \n\t[Name]: sin\n\t[Args]: x ",
-        "[Function]: \n\t[Name]: __anon_expr\n",
-        "[Function]: \n\t[Name]: __anon_expr\n",
-        "[Function]: \n\t[Name]: __anon_expr\n"
+        "[Function]: \n\t[Name]: __anon_expr\n\n\t[Body]: \n\t\t[If]\n",
+        "[Function]: \n\t[Name]: __anon_expr\n\n\t[Body]: \n\t\t[For]\n",
+        "[Function]: \n\t[Name]: __anon_expr\n\n\t[Body]: \n\t\t[For]\n",
+        "[Function]: \n\t[Name]: g\n\t[Args]: x \n\t[Body]: \n\t\t[Return]\n",
     };
 
     assert(target.size() == answer.size());

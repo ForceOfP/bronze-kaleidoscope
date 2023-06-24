@@ -46,13 +46,17 @@ void Parser::parse_top_level_expression() {
         return;
     }
 
+    Body body = {};
+    body.push_back(std::move(expression));
+
     // std::cout << "Parsed a top-level expr." << std::endl;
     
     auto proto = std::make_unique<ProtoType>("__anon_expr", std::vector<std::string>());
-    ast_tree_.push_back(std::make_unique<ASTNode>(FunctionNode{std::move(proto), std::move(expression)}));
+    // ast_tree_.push_back(std::make_unique<ASTNode>(FunctionNode{std::move(proto), std::move(expression)}));
+    ast_tree_.push_back(std::make_unique<ASTNode>(FunctionNode{std::move(proto), std::move(body)}));
 }
 
-/// definition ::= 'def' prototype { expression }
+/// definition ::= 'def' prototype { body }
 void Parser::parse_definition() {
     next_token(); //eat def
     auto proto = parse_prototype();
@@ -66,8 +70,12 @@ void Parser::parse_definition() {
     }
     next_token(); // eat {
 
-    auto expression = parse_expression();
+/*     auto expression = parse_expression();
     if (!expression) {
+        return;
+    } */
+    auto body = parse_body();
+    if (body.empty() && !err_.empty()) {
         return;
     }
 
@@ -78,7 +86,8 @@ void Parser::parse_definition() {
     next_token(); // eat }
     // std::cout << "Parsed a function definition." << std::endl;
 
-    ast_tree_.push_back(std::make_unique<ASTNode>(FunctionNode{std::move(proto), std::move(expression)}));
+    //ast_tree_.push_back(std::make_unique<ASTNode>(FunctionNode{std::move(proto), std::move(expression)}));
+    ast_tree_.push_back(std::make_unique<ASTNode>(FunctionNode{std::move(proto), std::move(body)}));
 }
 
 /// external ::= 'extern' prototype
@@ -89,6 +98,20 @@ void Parser::parse_extern() {
     // std::cout << "Parsed an extern." << std::endl;
 
     ast_tree_.push_back(std::make_unique<ASTNode>(ExternNode{std::move(proto)}));
+}
+
+/// body ::= (expression;)* return_expression;
+std::vector<ExpressionPtr> Parser::parse_body() {
+    std::vector<ExpressionPtr> body;
+    while (current_token_type() != TokenType::RightCurlyBrackets) {
+        auto line = parse_expression();
+        if (!line) {
+            return {};
+        }
+        next_token(); // eat ';'
+        body.push_back(std::move(line));
+    }
+    return body;
 }
 
 /// expression ::= primary binoprhs
@@ -243,6 +266,8 @@ ExpressionPtr Parser::parse_primary() {
         return parse_for_expr();
     case TokenType::Var:
         return parse_var_expr();
+    case TokenType::Return:
+        return parse_return_expr();
     default:
         err_ = "unknown token when expecting an expression";
         return nullptr;
@@ -298,7 +323,7 @@ ExpressionPtr Parser::parse_var_expr() {
     return std::make_unique<VarExpr>(std::move(names), std::move(body));
 }
 
-/// forexpr ::= 'for' '(' identifier '=' expr ',' expr (',' expr)? ')' { expression }
+/// forexpr ::= 'for' '(' identifier '=' expr ',' expr (',' expr)? ')' { body }
 ExpressionPtr Parser::parse_for_expr() {
     next_token(); // eat for
 
@@ -379,7 +404,7 @@ ExpressionPtr Parser::parse_for_expr() {
     );
 }
 
-/// ifexpr ::= 'if' '(' expression ')' '{' expression '}' ('else' '{' expression '}')?
+/// ifexpr ::= 'if' '(' expression ')' '{' body '}' ('else' '{' body '}')?
 ExpressionPtr Parser::parse_if_expr() {
     next_token(); // eat if
 
@@ -437,6 +462,13 @@ ExpressionPtr Parser::parse_if_expr() {
     return std::make_unique<IfExpr>(std::move(cond), std::move(then), std::move(_else));
 }
 
+/// return ::= 'return' expression;
+ExpressionPtr Parser::parse_return_expr() {
+    next_token(); // eat return
+    auto ret = parse_expression();
+    return std::make_unique<ReturnExpr>(std::move(ret));
+}
+
 /// unary
 ///   ::= primary
 ///   ::= '!' unary
@@ -448,7 +480,8 @@ ExpressionPtr Parser::parse_unary() {
         || current_token_type() == TokenType::Literal
         || current_token_type() == TokenType::For
         || current_token_type() == TokenType::If
-        || current_token_type() == TokenType::Var) {
+        || current_token_type() == TokenType::Var
+        || current_token_type() == TokenType::Return) {
         return parse_primary();
     }
 

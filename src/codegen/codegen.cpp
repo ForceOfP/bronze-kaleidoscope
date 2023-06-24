@@ -116,6 +116,15 @@ llvm::AllocaInst* CodeGenerator::create_entry_block_alloca(llvm::Function* funct
     return builder.CreateAlloca(llvm::Type::getDoubleTy(*context_), nullptr, var_name);
 }
 
+llvm::Value* CodeGenerator::codegen(std::unique_ptr<ReturnExpr> e) {
+    llvm::Value* ret = codegen(std::move(e->ret));
+    if (!ret) {
+        return nullptr;
+    }
+
+    return ret;
+} 
+
 llvm::Value* CodeGenerator::codegen(std::unique_ptr<VarExpr> e) {
     std::vector<llvm::AllocaInst*> old_bindings_{};
     llvm::Function* function = builder_->GetInsertBlock()->getParent();
@@ -463,7 +472,24 @@ llvm::Value* CodeGenerator::codegen(std::unique_ptr<Expression> e) {
         return codegen(std::move(tmp));  
     }
 
+    auto r = dynamic_cast<ReturnExpr*>(raw);
+    if (r) {
+        std::unique_ptr<ReturnExpr> tmp(r);
+        return codegen(std::move(tmp));  
+    }
+
     return nullptr;
+}
+
+llvm::Value* CodeGenerator::codegen(Body b) {
+    llvm::Value* tmp = nullptr;
+    for (auto& expr: b) {
+        tmp = codegen(std::move(expr));
+        if (!tmp) {
+            return nullptr;
+        }
+    }
+    return tmp;
 }
 
 llvm::Function* CodeGenerator::codegen(ProtoTypePtr p) {
