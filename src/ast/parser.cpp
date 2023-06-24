@@ -275,7 +275,7 @@ ExpressionPtr Parser::parse_primary() {
 }
 
 /// varexpr ::= 'var' identifier ('=' expression)?
-//                    (',' identifier ('=' expression)?)* 'in' expression
+//                    (',' identifier ('=' expression)?)*
 ExpressionPtr Parser::parse_var_expr() {
     next_token(); // eat var
     std::vector<std::pair<std::string, ExpressionPtr>> names;
@@ -309,7 +309,7 @@ ExpressionPtr Parser::parse_var_expr() {
         }
     }
 
-    if (current_token_type() != TokenType::In) {
+/*     if (current_token_type() != TokenType::In) {
         err_ = "expected 'in' keyword after 'var'";
         return nullptr;
     }
@@ -318,9 +318,9 @@ ExpressionPtr Parser::parse_var_expr() {
     auto body = parse_expression();
     if (!body) {
         return nullptr;
-    }
+    } */
 
-    return std::make_unique<VarExpr>(std::move(names), std::move(body));
+    return std::make_unique<VarExpr>(std::move(names)/* , std::move(body) */);
 }
 
 /// forexpr ::= 'for' '(' identifier '=' expr ',' expr (',' expr)? ')' { body }

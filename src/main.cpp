@@ -100,9 +100,9 @@ void driver(Stage stage) {
 }
 
 int main(int argv, char** args) {
-    auto state = Stage::Target;
+    auto state = Stage::Codegen;
 
-    if (state == Stage::Codegen) {
+    if (state == Stage::Target) {
         assert(argv == 3);
         file_driver(args[1], args[2]);
         return 0;

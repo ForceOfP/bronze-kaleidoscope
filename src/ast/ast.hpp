@@ -70,10 +70,10 @@ struct UnaryExpr: public Expression {
 
 struct VarExpr: public Expression {
     std::vector<std::pair<std::string, ExpressionPtr>> var_names;
-    ExpressionPtr body;
+    // ExpressionPtr body;
 
-    VarExpr(std::vector<std::pair<std::string, ExpressionPtr>> vars, ExpressionPtr _body):
-        var_names(std::move(vars)), body(std::move(_body)) {}
+    VarExpr(std::vector<std::pair<std::string, ExpressionPtr>> vars/* , ExpressionPtr _body */):
+        var_names(std::move(vars))/* , body(std::move(_body)) */ {}
 };
 
 struct ReturnExpr: public Expression {

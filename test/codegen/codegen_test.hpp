@@ -123,7 +123,7 @@ TEST(CODEGEN, ifelse) {
 TEST(CODEGEN, loop) {
     std::vector<std::string> target = {
         "def binary : 1 (x, y) {return y;};",
-        "def sum(n) {return var a = 0, b = 0 in (for (i = 0, i < n) {b = a + b : a = a + 1}) : b; }",
+        "def sum(n) {var a = 0, b = 0; for (i = 0, i < n) {b = a + b : a = a + 1}; return b; }",
         "sum(100)",
     };
 
@@ -185,7 +185,7 @@ TEST(CODEGEN, oper) {
 TEST(CODEGEN, variant) {
     std::vector<std::string> target = {
         "def binary : 1 (x, y) {return y;};",
-        "def fibi(x) {return var a = 1, b = 1, c in (for (i = 3, i < x) {c = a + b : a = b : b = c}) : b;};",
+        "def fibi(x) {var a = 1, b = 1, c; for (i = 3, i < x) {c = a + b : a = b : b = c}; return b;};",
         "fibi(10)",
     };
 

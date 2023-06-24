@@ -159,17 +159,17 @@ llvm::Value* CodeGenerator::codegen(std::unique_ptr<VarExpr> e) {
         symbol_table_.add_local(var_name, alloca);
     }
 
-    // Codegen the body, now that all vars are in scope.
+/*     // Codegen the body, now that all vars are in scope.
     llvm::Value* body_val = codegen(std::move(e->body));
     if (!body_val) {
         return nullptr;
     }
 
     // Pop all our variables from scope.
-    symbol_table_.back();
+    symbol_table_.back(); */
 
     // Return the body computation.
-    return body_val;
+    return nullptr;
 }
 
 llvm::Value* CodeGenerator::codegen(std::unique_ptr<UnaryExpr> e) {
@@ -485,7 +485,7 @@ llvm::Value* CodeGenerator::codegen(Body b) {
     llvm::Value* tmp = nullptr;
     for (auto& expr: b) {
         tmp = codegen(std::move(expr));
-        if (!tmp) {
+        if (!tmp && !err_.empty()) {
             return nullptr;
         }
     }
@@ -554,6 +554,7 @@ llvm::Function* CodeGenerator::codegen(FunctionNode& f) {
     }
 
     function->eraseFromParent();
+    symbol_table_.back();
     return nullptr;
 }
 
@@ -582,9 +583,9 @@ void CodeGenerator::codegen(std::vector<ASTNodePtr>&& ast_tree) {
                     if (auto ir = codegen(f)) {
                         if (setting_.print_ir) {
                             ir->print(output_stream_);
-                        }/*  else {
+                        } else {
                             output_stream_ << "parsed definition.\n";
-                        } */
+                        }
                     } else {
                         output_stream_ << err_ << '\n';
                     }                        
