@@ -1,6 +1,8 @@
 #include "codegen.hpp"
 #include "extern.hpp"
 
+#include <llvm-15/llvm/IR/BasicBlock.h>
+#include <llvm-15/llvm/IR/Instructions.h>
 #include <llvm/ADT/Optional.h>
 #include <llvm/Support/CodeGen.h>
 #include <llvm/Support/FileSystem.h>
@@ -118,11 +120,13 @@ llvm::AllocaInst* CodeGenerator::create_entry_block_alloca(llvm::Function* funct
 
 llvm::Value* CodeGenerator::codegen(std::unique_ptr<ReturnExpr> e) {
     llvm::Value* ret = codegen(std::move(e->ret));
-    if (!ret) {
+    if (!err_.empty()) {
         return nullptr;
     }
 
-    return ret;
+    builder_->CreateStore(ret, ret_alloca);
+    builder_->CreateBr(return_block);
+    return nullptr;
 } 
 
 llvm::Value* CodeGenerator::codegen(std::unique_ptr<VarExpr> e) {
@@ -230,7 +234,8 @@ llvm::Value* CodeGenerator::codegen(std::unique_ptr<ForExpr> e) {
     // Emit the body of the loop.  This, like any other expr, can change the
     // current BB.  Note that we ignore the value computed by the body, but don't
     // allow an error.
-    if (!codegen(std::move(e->body))) {
+    codegen(std::move(e->body));
+    if (!err_.empty()) {
         return nullptr;
     }
 
@@ -285,28 +290,29 @@ llvm::Value* CodeGenerator::codegen(std::unique_ptr<IfExpr> e) {
 
     llvm::BasicBlock* then_block = llvm::BasicBlock::Create(*context_, "then", function);
     llvm::BasicBlock* else_block = llvm::BasicBlock::Create(*context_, "else");
-    llvm::BasicBlock* merge_block = llvm::BasicBlock::Create(*context_, "ifcont");
+    // llvm::BasicBlock* merge_block = llvm::BasicBlock::Create(*context_, "ifcont");
 
     builder_->CreateCondBr(cond_value, then_block, else_block);
     builder_->SetInsertPoint(then_block);
 
     llvm::Value* then_value = codegen(std::move(e->then));
-    if (!then_value) {
+    if (!err_.empty()) {
         return nullptr;
     }
 
-    builder_->CreateBr(merge_block);
+    // builder_->CreateBr(merge_block);
     then_block = builder_->GetInsertBlock();
 
     if (e->_else.empty()) {
-        auto& merge_inserting_blocks = function->getBasicBlockList();
-        merge_inserting_blocks.insert(function->end(), merge_block);
+        // auto& merge_inserting_blocks = function->getBasicBlockList();
+        // merge_inserting_blocks.insert(function->end(), merge_block);
 
-        builder_->SetInsertPoint(merge_block);
-        llvm::PHINode* phi = builder_->CreatePHI(llvm::Type::getDoubleTy(*context_), 1, "iftmp");
+        // builder_->SetInsertPoint(merge_block);
+        // llvm::PHINode* phi = builder_->CreatePHI(llvm::Type::getDoubleTy(*context_), 1, "iftmp");
 
-        phi->addIncoming(then_value, then_block);
-        return phi;
+        // phi->addIncoming(then_value, then_block);
+        // return phi;
+        return nullptr;
     }
 
     // llvm implement a function named Function::insert() at llvm17...
@@ -317,23 +323,24 @@ llvm::Value* CodeGenerator::codegen(std::unique_ptr<IfExpr> e) {
     builder_->SetInsertPoint(else_block);
 
     llvm::Value* else_value = codegen(std::move(e->_else));
-    if (!else_value) {
+    if (!err_.empty()) {
         return nullptr;
     } 
 
-    builder_->CreateBr(merge_block);
+    // builder_->CreateBr(merge_block);
     else_block = builder_->GetInsertBlock();
 
     // like behind.
-    auto& merge_inserting_blocks = function->getBasicBlockList();
-    merge_inserting_blocks.insert(function->end(), merge_block);
+    // auto& merge_inserting_blocks = function->getBasicBlockList();
+    // merge_inserting_blocks.insert(function->end(), merge_block);
 
-    builder_->SetInsertPoint(merge_block);
-    llvm::PHINode* phi = builder_->CreatePHI(llvm::Type::getDoubleTy(*context_), 2, "iftmp");
+    // builder_->SetInsertPoint(merge_block);
+    // llvm::PHINode* phi = builder_->CreatePHI(llvm::Type::getDoubleTy(*context_), 2, "iftmp");
 
-    phi->addIncoming(then_value, then_block);
-    phi->addIncoming(else_value, else_block);
-    return phi;
+    // phi->addIncoming(then_value, then_block);
+    // phi->addIncoming(else_value, else_block);
+    // return phi;
+    return nullptr;
 }
 
 llvm::Value* CodeGenerator::codegen(std::unique_ptr<CallExpr> e) {
@@ -371,7 +378,7 @@ llvm::Value* CodeGenerator::codegen(std::unique_ptr<BinaryExpr> e) {
         }
 
         llvm::Value* rhs_value = codegen(std::move(e->rhs));
-        if (!rhs_value) {
+        if (!err_.empty()) {
             return nullptr;
         }
 
@@ -483,13 +490,15 @@ llvm::Value* CodeGenerator::codegen(std::unique_ptr<Expression> e) {
 
 llvm::Value* CodeGenerator::codegen(Body b) {
     llvm::Value* tmp = nullptr;
+
     for (auto& expr: b) {
         tmp = codegen(std::move(expr));
-        if (!tmp && !err_.empty()) {
+        if (!err_.empty()) {
             return nullptr;
         }
     }
-    return tmp;
+
+    return nullptr;
 }
 
 llvm::Function* CodeGenerator::codegen(ProtoTypePtr p) {
@@ -540,21 +549,30 @@ llvm::Function* CodeGenerator::codegen(FunctionNode& f) {
         symbol_table_.add_local(std::string(arg.getName()), alloca);
     }
 
-    if (llvm::Value* return_value = codegen(std::move(f.body))) {
-        builder_->CreateRet(return_value);
+    return_block = llvm::BasicBlock::Create(*context_, "return");
+    ret_alloca = create_entry_block_alloca(function, "alloca");
+    auto& return_inserting_blocks = function->getBasicBlockList();
+    return_inserting_blocks.insert(function->end(), return_block); 
+
+    codegen(std::move(f.body));
+    if (err_.empty()) {
+        builder_->SetInsertPoint(return_block);
+        llvm::Value* ret_value = builder_->CreateLoad(ret_alloca->getAllocatedType(), ret_alloca, "final");
+        builder_->CreateRet(ret_value);
         
         // Validate the generated code, checking for consistency.
         llvm::verifyFunction(*function);
 
         if (setting_.function_pass_optimize) {
-            function_pass_manager_->run(*function);
+            // function_pass_manager_->run(*function);
         }
         
+        symbol_table_.back();
         return function;
     }
 
-    function->eraseFromParent();
     symbol_table_.back();
+    function->eraseFromParent();
     return nullptr;
 }
 

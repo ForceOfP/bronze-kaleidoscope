@@ -103,10 +103,11 @@ TEST(CODEGEN, ifelse) {
     std::vector<std::string> target = {
         "def double(x) {return x + x;}",
         "def triple(x) {return x * 3;}",
-        "def f(x) {return if (x < 3) {double(x);} else {triple(x);};};",
+        "def f(x) {if (x < 3) {return double(x);} else {return triple(x);};};",
         "f(2)",
         "f(5)"
     };
+    // def f(x) { if (x < 3) {return 1;} else { return 2;}; }
 
     std::vector<std::string> answer = {
         "parsed definition.\n",
@@ -141,13 +142,13 @@ TEST(CODEGEN, oper) {
     std::vector<std::string> target = {
 /*         "def unary - (v) 0 - v;",
         "-(2+3)", */
-        "def unary ! (v) {return if (v) {0;} else {1;};};",
+        "def unary ! (v) {if (v) {return 0;} else {return 1;};};",
         "!1",
         "!0",
-        "def binary | 5 (LHS, RHS) {return if (LHS) {1;} else {if (RHS) {1;} else {0;};};};",
+        "def binary | 5 (LHS, RHS) {if (LHS) {return 1;} else {if (RHS) {return 1;} else {return 0;};};};",
         "0|0",
         "1|0",
-        "def binary & 6 (LHS, RHS) {return if (!LHS) {0;} else {!(!RHS);};};",
+        "def binary & 6 (LHS, RHS) {if (!LHS) {return 0;} else {return !(!RHS);};};",
         "1&0",
         "1&1",
         "def binary > 10 (LHS, RHS) {return RHS < LHS;};",

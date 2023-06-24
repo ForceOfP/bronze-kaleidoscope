@@ -32,11 +32,11 @@ TEST(AST, parse) {
 
     const std::vector<std::string> answer = {
         "[Function]: \n\t[Name]: f\n\t[Args]: x \n\t[Body]: \n\t\t[Return]\n",
-        "[Function]: \n\t[Name]: __anon_expr\n\n\t[Body]: \n\t\t[Literal]\n",
+        "[Function]: \n\t[Name]: __anon_expr\n\n\t[Body]: \n\t\t[Return]\n",
         "[Extern]: \n\t[Name]: sin\n\t[Args]: x ",
-        "[Function]: \n\t[Name]: __anon_expr\n\n\t[Body]: \n\t\t[If]\n",
-        "[Function]: \n\t[Name]: __anon_expr\n\n\t[Body]: \n\t\t[For]\n",
-        "[Function]: \n\t[Name]: __anon_expr\n\n\t[Body]: \n\t\t[For]\n",
+        "[Function]: \n\t[Name]: __anon_expr\n\n\t[Body]: \n\t\t[Return]\n",
+        "[Function]: \n\t[Name]: __anon_expr\n\n\t[Body]: \n\t\t[Return]\n",
+        "[Function]: \n\t[Name]: __anon_expr\n\n\t[Body]: \n\t\t[Return]\n",
         "[Function]: \n\t[Name]: g\n\t[Args]: x \n\t[Body]: \n\t\t[Return]\n",
     };
 

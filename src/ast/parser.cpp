@@ -47,7 +47,8 @@ void Parser::parse_top_level_expression() {
     }
 
     Body body = {};
-    body.push_back(std::move(expression));
+    auto ret = std::make_unique<ReturnExpr>(std::move(expression));
+    body.push_back(std::move(ret));
 
     // std::cout << "Parsed a top-level expr." << std::endl;
     

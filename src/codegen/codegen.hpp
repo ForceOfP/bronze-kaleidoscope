@@ -74,4 +74,7 @@ protected:
     CodeGeneratorSetting setting_;
     OperatorFunctionManager operator_function_manager_;
     SymbolTable symbol_table_;
+
+    llvm::BasicBlock* return_block = nullptr;
+    llvm::AllocaInst* ret_alloca = nullptr;
 };
