@@ -27,7 +27,7 @@ TEST(AST, tokenize) {
         "; , ( ) + - * = += == { }",
         "extern",
         "def f(x) x + x ###afeabgnan####",
-        "for in if else then",
+        "for in if else",
         "return 1"
     };
     std::vector<std::string> answer = {
@@ -38,7 +38,7 @@ TEST(AST, tokenize) {
         "[;] [,] [(] [)] [Oper: +] [Oper: -] [Oper: *] [Oper: =] [Oper: +=] [Oper: ==] [{] [}]",
         "[Extern]",
         "[Def] [Ident: f] [(] [Ident: x] [)] [Ident: x] [Oper: +] [Ident: x]",
-        "[For] [In] [If] [Else] [Then]",
+        "[For] [In] [If] [Else]",
         "[Return] [Literal: 1]"
     };
 

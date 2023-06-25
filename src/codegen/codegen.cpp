@@ -567,7 +567,7 @@ llvm::Function* CodeGenerator::codegen(FunctionNode& f) {
         llvm::verifyFunction(*function);
 
         if (setting_.function_pass_optimize) {
-            // function_pass_manager_->run(*function);
+            function_pass_manager_->run(*function);
         }
         
         symbol_table_.back();

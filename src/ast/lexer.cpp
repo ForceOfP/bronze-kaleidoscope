@@ -54,8 +54,6 @@ std::vector<Token> Lexer::tokenize(std::string target_) {
                         ans.emplace_back(TokenType::If);
                     } else if (token_context == "else") {
                         ans.emplace_back(TokenType::Else);
-                    } else if (token_context == "then") {
-                        ans.emplace_back(TokenType::Then);
                     } else if (token_context == "for") {
                         ans.emplace_back(TokenType::For);
                     } else if (token_context == "in") {

@@ -22,7 +22,6 @@ enum class TokenType {
     Operator, // with a string
     If,
     Else,
-    Then,
     For,
     In,
     Binary,
@@ -70,8 +69,6 @@ public:
             os << "[If]"; break;
         case TokenType::Else:
             os << "[Else]"; break;
-        case TokenType::Then:
-            os << "[Then]"; break;
         case TokenType::For:
             os << "[For]"; break;
         case TokenType::In:
