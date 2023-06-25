@@ -109,7 +109,9 @@ std::vector<ExpressionPtr> Parser::parse_body() {
         if (!line) {
             return {};
         }
-        next_token(); // eat ';'
+        if (current_token_type() == TokenType::Delimiter) {
+            next_token(); // eat ';'
+        }
         body.push_back(std::move(line));
     }
     return body;

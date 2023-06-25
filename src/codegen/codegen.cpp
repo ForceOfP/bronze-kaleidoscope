@@ -2,7 +2,9 @@
 #include "extern.hpp"
 
 #include <llvm-15/llvm/IR/BasicBlock.h>
+#include <llvm-15/llvm/IR/Constants.h>
 #include <llvm-15/llvm/IR/Instructions.h>
+#include <llvm-15/llvm/IR/Type.h>
 #include <llvm/ADT/Optional.h>
 #include <llvm/Support/CodeGen.h>
 #include <llvm/Support/FileSystem.h>
@@ -278,6 +280,8 @@ llvm::Value* CodeGenerator::codegen(std::unique_ptr<ForExpr> e) {
 }
 
 llvm::Value* CodeGenerator::codegen(std::unique_ptr<IfExpr> e) {
+    assert(!e->then.empty() && !e->_else.empty());
+    
     auto cond_value = codegen(std::move(e->condition));
     if (!cond_value) {
         return nullptr;
@@ -290,29 +294,21 @@ llvm::Value* CodeGenerator::codegen(std::unique_ptr<IfExpr> e) {
 
     llvm::BasicBlock* then_block = llvm::BasicBlock::Create(*context_, "then", function);
     llvm::BasicBlock* else_block = llvm::BasicBlock::Create(*context_, "else");
-    // llvm::BasicBlock* merge_block = llvm::BasicBlock::Create(*context_, "ifcont");
+    llvm::BasicBlock* merge_block = llvm::BasicBlock::Create(*context_, "ifcont");
 
     builder_->CreateCondBr(cond_value, then_block, else_block);
     builder_->SetInsertPoint(then_block);
 
-    llvm::Value* then_value = codegen(std::move(e->then));
+    llvm::Value* then_value = nullptr;
+    
+    then_value = codegen(std::move(e->then));
     if (!err_.empty()) {
         return nullptr;
     }
-
-    // builder_->CreateBr(merge_block);
-    then_block = builder_->GetInsertBlock();
-
-    if (e->_else.empty()) {
-        // auto& merge_inserting_blocks = function->getBasicBlockList();
-        // merge_inserting_blocks.insert(function->end(), merge_block);
-
-        // builder_->SetInsertPoint(merge_block);
-        // llvm::PHINode* phi = builder_->CreatePHI(llvm::Type::getDoubleTy(*context_), 1, "iftmp");
-
-        // phi->addIncoming(then_value, then_block);
-        // return phi;
-        return nullptr;
+    
+    if (then_value) {
+        builder_->CreateBr(merge_block);
+        then_block = builder_->GetInsertBlock();
     }
 
     // llvm implement a function named Function::insert() at llvm17...
@@ -327,19 +323,26 @@ llvm::Value* CodeGenerator::codegen(std::unique_ptr<IfExpr> e) {
         return nullptr;
     } 
 
-    // builder_->CreateBr(merge_block);
-    else_block = builder_->GetInsertBlock();
+    if (else_value) {
+        builder_->CreateBr(merge_block);
+        else_block = builder_->GetInsertBlock();
+    }
 
-    // like behind.
-    // auto& merge_inserting_blocks = function->getBasicBlockList();
-    // merge_inserting_blocks.insert(function->end(), merge_block);
+    if (else_value && then_value) {
+        auto& merge_inserting_blocks = function->getBasicBlockList();
+        merge_inserting_blocks.insert(function->end(), merge_block);
 
-    // builder_->SetInsertPoint(merge_block);
-    // llvm::PHINode* phi = builder_->CreatePHI(llvm::Type::getDoubleTy(*context_), 2, "iftmp");
+        builder_->SetInsertPoint(merge_block);
+        llvm::PHINode* phi = builder_->CreatePHI(llvm::Type::getDoubleTy(*context_), 2, "iftmp");
 
-    // phi->addIncoming(then_value, then_block);
-    // phi->addIncoming(else_value, else_block);
-    // return phi;
+        phi->addIncoming(then_value, then_block);
+        phi->addIncoming(else_value, else_block);
+        return phi;
+    } else if (then_value || else_value) {
+        err_ = "different return type in if";
+        return nullptr;
+    }
+
     return nullptr;
 }
 
@@ -498,7 +501,7 @@ llvm::Value* CodeGenerator::codegen(Body b) {
         }
     }
 
-    return nullptr;
+    return tmp;
 }
 
 llvm::Function* CodeGenerator::codegen(ProtoTypePtr p) {
