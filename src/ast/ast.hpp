@@ -72,9 +72,10 @@ struct UnaryExpr: public Expression {
 
 struct VarExpr: public Expression {
     std::vector<std::pair<std::string, ExpressionPtr>> var_names;
+    bool is_const;
 
-    explicit VarExpr(std::vector<std::pair<std::string, ExpressionPtr>> vars):
-        var_names(std::move(vars)) {}
+    explicit VarExpr(std::vector<std::pair<std::string, ExpressionPtr>> vars, bool _is_const):
+        var_names(std::move(vars)), is_const(_is_const) {}
 };
 
 struct ReturnExpr: public Expression {

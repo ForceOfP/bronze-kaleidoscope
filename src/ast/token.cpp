@@ -13,3 +13,9 @@ double Token::get_literal() const {
 
     return std::any_cast<double>(this->value_);
 }
+
+bool Token::is_const() const {
+    assert(this->type_ == TokenType::Var);
+
+    return std::any_cast<bool>(this->value_);
+}

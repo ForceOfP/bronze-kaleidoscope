@@ -277,9 +277,10 @@ ExpressionPtr Parser::parse_primary() {
     }
 }
 
-/// varexpr ::= 'var' identifier ('=' expression)?
+/// varexpr ::= ['var'|'val'] identifier ('=' expression)?
 //                    (',' identifier ('=' expression)?)*
 ExpressionPtr Parser::parse_var_expr() {
+    bool is_const = token_iter_->is_const();
     next_token(); // eat var
     std::vector<std::pair<std::string, ExpressionPtr>> names;
 
@@ -312,7 +313,7 @@ ExpressionPtr Parser::parse_var_expr() {
         }
     }
 
-    return std::make_unique<VarExpr>(std::move(names)/* , std::move(body) */);
+    return std::make_unique<VarExpr>(std::move(names), is_const);
 }
 
 /// forexpr ::= 'for' '(' identifier '=' expr ',' expr (',' expr)? ')' { body }

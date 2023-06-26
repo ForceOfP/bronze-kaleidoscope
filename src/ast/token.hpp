@@ -26,7 +26,7 @@ enum class TokenType {
     In,
     Binary,
     Unary,
-    Var,
+    Var, // with a bool
     Return,
     Init
 };
@@ -35,11 +35,13 @@ class Token {
 public:
     Token(TokenType t, std::string v): type_(t), value_(v) {}
     Token(TokenType t, double v): type_(t), value_(v) {}
+    Token(TokenType t, bool c): type_(t), value_(c) {}
     explicit Token(TokenType t): type_(t) {}
     Token() = default;
 
     [[nodiscard]] std::string get_string() const;
     [[nodiscard]] double get_literal() const;
+    [[nodiscard]] bool is_const() const;
 
     friend std::ostream& operator<<(std::ostream& os, const Token& t) {
         switch (t.type_) {

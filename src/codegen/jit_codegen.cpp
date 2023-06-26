@@ -98,14 +98,10 @@ llvm::Value* JitCodeGenerator::codegen(std::unique_ptr<BinaryExpr> e) {
             return nullptr;
         }
 
-        llvm::Value* lhs_value_alloca = symbol_table_.find(lhse->name); 
-        
-        if (!lhs_value_alloca) {
-            err_ = "Unknown variable name";
+        if (!symbol_table_.store(builder_.get(), lhse->name, rhs_value)) {
+            err_ = "SymbolTable store " + lhse->name + " failed.";
             return nullptr;
         }
-
-        builder_->CreateStore(rhs_value, lhs_value_alloca);
         return rhs_value; // support a = (b = c);
     }
     

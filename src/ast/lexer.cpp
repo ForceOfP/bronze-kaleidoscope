@@ -63,7 +63,9 @@ std::vector<Token> Lexer::tokenize(std::string target_) {
                     } else if (token_context == "unary") {
                         ans.emplace_back(TokenType::Unary);
                     } else if (token_context == "var") {
-                        ans.emplace_back(TokenType::Var);
+                        ans.emplace_back(TokenType::Var, false);
+                    }  else if (token_context == "val") {
+                        ans.emplace_back(TokenType::Var, true);
                     } else if (token_context == "return") {
                         ans.emplace_back(TokenType::Return);
                     } else {

@@ -1,10 +1,9 @@
 #pragma once
 
-#include <llvm-15/llvm/IR/GlobalValue.h>
-#include <llvm/IR/GlobalValue.h>
-#include <llvm/IR/Instructions.h>
+#include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/Value.h>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 class SymbolTable {
 public:
@@ -12,11 +11,12 @@ public:
 
     void step();
     void back();
-    void add_local(const std::string& name, llvm::AllocaInst* inst);
-    void add_global(const std::string& name, llvm::GlobalValue* value);
-    llvm::Value* find(const std::string& name);
+    void add_variant(const std::string& name, llvm::AllocaInst* inst);
+    void add_constant(const std::string& name, llvm::Value* constant);
 
+    llvm::Value* load(llvm::IRBuilder<>* builder, const std::string& name);
+    bool store(llvm::IRBuilder<>* builder, const std::string& name, llvm::Value* target);
 private:
-    std::vector<std::unordered_map<std::string, llvm::AllocaInst*>> scoped_blocks_;
-    std::unordered_map<std::string, llvm::GlobalValue*> global_values_;
+    std::vector<std::unordered_map<std::string, llvm::AllocaInst*>> variant_scoped_blocks_;
+    std::vector<std::unordered_map<std::string, llvm::Value*>> constant_scoped_blocks_;
 };

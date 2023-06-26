@@ -143,13 +143,11 @@ TEST(CODEGEN, ifelse2) {
 
 TEST(CODEGEN, loop) {
     std::vector<std::string> target = {
-        "def binary : 1 (x, y) {return y;};",
         "def sum(n) {var a = 0, b = 0; for (i = 0, i < n) {b = a + b; a = a + 1;} return b; }",
         "sum(100)",
     };
 
     std::vector<std::string> answer = {
-        "parsed definition.\n",
         "parsed definition.\n",
         "5050.000000\n",
     };
@@ -205,13 +203,11 @@ TEST(CODEGEN, oper) {
 
 TEST(CODEGEN, variant) {
     std::vector<std::string> target = {
-        "def binary : 1 (x, y) {return y;};",
         "def fibi(x) {var a = 1, b = 1, c; for (i = 3, i < x) {c = a + b; a = b; b = c;} return b;};",
         "fibi(10)",
     };
 
     std::vector<std::string> answer = {
-        "parsed definition.\n",
         "parsed definition.\n",
         "55.000000\n",
     };
@@ -220,3 +216,17 @@ TEST(CODEGEN, variant) {
     codegen_helper(target, answer);
 }
 
+TEST(CODEGEN, invariant) {
+    std::vector<std::string> target = {
+        "def exp(x, n) {val a = x; var t = 1; for (i = 1, i < n) {t = t * a;} return t;};",
+        "exp(10, 3)",
+    };
+
+    std::vector<std::string> answer = {
+        "parsed definition.\n",
+        "1000.000000\n",
+    };
+
+    assert(target.size() == answer.size());
+    codegen_helper(target, answer);
+}

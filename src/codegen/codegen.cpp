@@ -1,10 +1,6 @@
 #include "codegen.hpp"
 #include "extern.hpp"
 
-#include <llvm-15/llvm/IR/BasicBlock.h>
-#include <llvm-15/llvm/IR/Constants.h>
-#include <llvm-15/llvm/IR/Instructions.h>
-#include <llvm-15/llvm/IR/Type.h>
 #include <llvm/ADT/Optional.h>
 #include <llvm/Support/CodeGen.h>
 #include <llvm/Support/FileSystem.h>
@@ -126,7 +122,10 @@ llvm::Value* CodeGenerator::codegen(std::unique_ptr<ReturnExpr> e) {
         return nullptr;
     }
 
-    builder_->CreateStore(ret, ret_alloca);
+    if (ret) {
+        builder_->CreateStore(ret, ret_alloca);
+    }
+
     builder_->CreateBr(return_block);
     return nullptr;
 } 
@@ -142,11 +141,6 @@ llvm::Value* CodeGenerator::codegen(std::unique_ptr<VarExpr> e) {
         const std::string& var_name = e->var_names[i].first;
         auto init = std::move(e->var_names[i].second);
 
-        // Emit the initializer before adding the variable to scope, this prevents
-        // the initializer from referencing the variable itself, and permits stuff
-        // like this:
-        //  var a = 1 in
-        //    var a = a in ...   # refers to outer 'a'.
         llvm::Value* init_value;
         if (init) {
             init_value = codegen(std::move(init));
@@ -157,24 +151,19 @@ llvm::Value* CodeGenerator::codegen(std::unique_ptr<VarExpr> e) {
             init_value = llvm::ConstantFP::get(*context_, llvm::APFloat(0.0));
         }
 
-        llvm::AllocaInst* alloca = create_entry_block_alloca(function, var_name);
-        builder_->CreateStore(init_value, alloca);
-
-        // Remember the old variable binding so that we can restore the binding when
-        // we unrecurse.        
-        symbol_table_.add_local(var_name, alloca);
+        if (e->is_const) {
+            if (!init_value) {
+                output_stream_ << "error in store const\n";
+            }
+            symbol_table_.add_constant(var_name, init_value);
+        } else {
+            llvm::AllocaInst* alloca = create_entry_block_alloca(function, var_name);
+            builder_->CreateStore(init_value, alloca);
+            
+            symbol_table_.add_variant(var_name, alloca);
+        }
     }
 
-/*     // Codegen the body, now that all vars are in scope.
-    llvm::Value* body_val = codegen(std::move(e->body));
-    if (!body_val) {
-        return nullptr;
-    }
-
-    // Pop all our variables from scope.
-    symbol_table_.back(); */
-
-    // Return the body computation.
     return nullptr;
 }
 
@@ -231,7 +220,7 @@ llvm::Value* CodeGenerator::codegen(std::unique_ptr<ForExpr> e) {
     // Within the loop, the variable is defined equal to the PHI node.  If it
     // shadows an existing variable, we have to restore it, so save it now.
     symbol_table_.step();
-    symbol_table_.add_local(e->var_name, alloca);
+    symbol_table_.add_variant(e->var_name, alloca);
 
     // Emit the body of the loop.  This, like any other expr, can change the
     // current BB.  Note that we ignore the value computed by the body, but don't
@@ -385,13 +374,17 @@ llvm::Value* CodeGenerator::codegen(std::unique_ptr<BinaryExpr> e) {
             return nullptr;
         }
 
-        llvm::Value* lhs_value_alloca = symbol_table_.find(lhse->name);
+/*         llvm::Value* lhs_value_alloca = symbol_table_.find(lhse->name);
         if (!lhs_value_alloca) {
             err_ = "Unknown variable name";
             return nullptr;
         }
 
-        builder_->CreateStore(rhs_value, lhs_value_alloca);
+        builder_->CreateStore(rhs_value, lhs_value_alloca); */
+        if (!symbol_table_.store(builder_.get(), lhse->name, rhs_value)) {
+            err_ = "SymbolTable store " + lhse->name + "failed.";
+            return nullptr;
+        }
         return rhs_value; // support a = (b = c);
     }
     
@@ -419,13 +412,19 @@ llvm::Value* CodeGenerator::codegen(std::unique_ptr<BinaryExpr> e) {
 }
 
 llvm::Value* CodeGenerator::codegen(std::unique_ptr<VariableExpr> e) {
-    auto target = symbol_table_.find(e->name);
+/*     auto target = symbol_table_.find(e->name);
     auto a = static_cast<llvm::AllocaInst*>(target);
     if (!a) {
         err_ = "Unknown variable name";
         return nullptr;
     }
-    return builder_->CreateLoad(a->getAllocatedType(), a, e->name.c_str());
+    return builder_->CreateLoad(a->getAllocatedType(), a, e->name.c_str()); */
+    if (auto ret = symbol_table_.load(builder_.get(), e->name)) {
+        return ret;
+    }
+
+    err_ = "SymbolTable load " + e->name + " failed.";
+    return nullptr;
 }
 
 llvm::Value* CodeGenerator::codegen(std::unique_ptr<LiteralExpr> e) {
@@ -549,7 +548,7 @@ llvm::Function* CodeGenerator::codegen(FunctionNode& f) {
         // Store the initial value into the alloca.
         builder_->CreateStore(&arg, alloca);
 
-        symbol_table_.add_local(std::string(arg.getName()), alloca);
+        symbol_table_.add_variant(std::string(arg.getName()), alloca);
     }
 
     return_block = llvm::BasicBlock::Create(*context_, "return");
