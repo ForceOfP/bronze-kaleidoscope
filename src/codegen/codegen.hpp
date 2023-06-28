@@ -52,7 +52,6 @@ public:
         {"=", 2}, {"<", 10}, {"+", 20}, {"-", 20}, {"*", 40}};
 
 protected:
-    // virtual void initialize_llvm_elements();
     llvm::Function* get_function(std::string& name);
     llvm::AllocaInst* create_entry_block_alloca(llvm::Function* function,
                                                 const std::string& var_name);
@@ -63,8 +62,6 @@ protected:
     std::unique_ptr<llvm::Module> module_;
     std::unique_ptr<llvm::legacy::FunctionPassManager> function_pass_manager_;
 
-    // std::map<std::string, llvm::Value*> named_values_;
-    // std::map<std::string, llvm::AllocaInst*> named_values_alloca_;
     std::map<std::string, ProtoType> function_protos_ = {};
     std::string err_;
     llvm::ExitOnError exit_on_error_;

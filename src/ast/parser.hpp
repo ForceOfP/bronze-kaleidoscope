@@ -22,7 +22,6 @@ public:
 
     std::vector<ASTNodePtr> parse();
     void parse_top_level_expression();
-    void parse_top_level_expression_tmp();
     void parse_definition();
     void parse_extern();
 

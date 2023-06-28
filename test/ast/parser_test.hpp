@@ -24,9 +24,9 @@ TEST(AST, parse) {
         "def f(x) { return x + x; }",
         "exec 2.3",
         "extern sin(x)",
-        "if (1) {2;} else {3;};",
-        "for (i = 0, i < n, 1.0) {1;};",
-        "for (i = 0, i < n) {1;};",
+        "exec if (1) {2;} else {3;};",
+        "exec for (i = 0, i < n, 1.0) {1;};",
+        "exec for (i = 0, i < n) {1;};",
         "def g(x) { return 1; }"
     };
 
