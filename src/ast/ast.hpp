@@ -9,6 +9,7 @@
 #include <variant>
 
 #include "utils/rustic_match.hpp"
+#include "type.hpp"
 
 class Expression {
 public:
@@ -70,12 +71,15 @@ struct UnaryExpr: public Expression {
         _operater(std::move(name)), operand(std::move(opnd)) {}
 };
 
-struct VarExpr: public Expression {
-    std::vector<std::pair<std::string, ExpressionPtr>> var_names;
+struct VarExpr: public Expression {    
+    TypeSystem::Type type;
+    std::string name;
+    ExpressionPtr value;
     bool is_const;
 
-    explicit VarExpr(std::vector<std::pair<std::string, ExpressionPtr>> vars, bool _is_const):
-        var_names(std::move(vars)), is_const(_is_const) {}
+    explicit VarExpr(
+        TypeSystem::Type _type, std::string _name, ExpressionPtr expr, bool _is_const):
+        type(_type), name(std::move(_name)), value(std::move(expr)), is_const(_is_const) {}
 };
 
 struct ReturnExpr: public Expression {
@@ -86,11 +90,11 @@ struct ReturnExpr: public Expression {
 
 struct ProtoType {
     std::string name;
-    std::vector<std::string> args;
+    std::vector<std::pair<std::string, TypeSystem::Type>> args;
     bool is_operator_;
     unsigned precedence_;
 
-    ProtoType(std::string _name, std::vector<std::string> _args,
+    ProtoType(std::string _name, std::vector<std::pair<std::string, TypeSystem::Type>> _args,
                 bool is_oper = false, unsigned prec = 0):
         name(std::move(_name)), args(std::move(_args)), is_operator_(is_oper), precedence_(prec) {}
 

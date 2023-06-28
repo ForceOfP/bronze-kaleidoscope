@@ -1,5 +1,4 @@
 #include "codegen.hpp"
-#include "extern.hpp"
 
 #include <llvm/ADT/Optional.h>
 #include <llvm/Support/CodeGen.h>
@@ -35,6 +34,8 @@
 #include <vector>
 #include <cassert>
 
+#include "ast/type.hpp"
+#include "extern.hpp"
 #include "ast/ast.hpp"
 #include "codegen/jit_engine.hpp"
 
@@ -136,32 +137,30 @@ llvm::Value* CodeGenerator::codegen(std::unique_ptr<VarExpr> e) {
 
     symbol_table_.step();
 
-    // Register all variables and emit their initializer.
-    for (auto i = 0; i < e->var_names.size(); i++) {
-        const std::string& var_name = e->var_names[i].first;
-        auto init = std::move(e->var_names[i].second);
+    auto& var_name = e->name;
+    auto var_type = e->type;
+    auto init = std::move(e->value);
 
-        llvm::Value* init_value;
-        if (init) {
-            init_value = codegen(std::move(init));
-            if (!init_value) {
-                return nullptr;
-            }
-        } else { // If not specified, use 0.0.
-            init_value = llvm::ConstantFP::get(*context_, llvm::APFloat(0.0));
+    llvm::Value* init_value;
+    if (init) {
+        init_value = codegen(std::move(init));
+        if (!init_value) {
+            return nullptr;
         }
+    } else { // If not specified, use 0.0.
+        init_value = TypeSystem::get_type_init_value(var_type, *context_);
+    }
 
-        if (e->is_const) {
-            if (!init_value) {
-                output_stream_ << "error in store const\n";
-            }
-            symbol_table_.add_constant(var_name, init_value);
-        } else {
-            llvm::AllocaInst* alloca = create_entry_block_alloca(function, var_name);
-            builder_->CreateStore(init_value, alloca);
-            
-            symbol_table_.add_variant(var_name, alloca);
+    if (e->is_const) {
+        if (!init_value) {
+            output_stream_ << "error in store const\n";
         }
+        symbol_table_.add_constant(var_name, init_value);
+    } else {
+        llvm::AllocaInst* alloca = create_entry_block_alloca(function, var_name);
+        builder_->CreateStore(init_value, alloca);
+        
+        symbol_table_.add_variant(var_name, alloca);
     }
 
     return nullptr;
@@ -374,13 +373,6 @@ llvm::Value* CodeGenerator::codegen(std::unique_ptr<BinaryExpr> e) {
             return nullptr;
         }
 
-/*         llvm::Value* lhs_value_alloca = symbol_table_.find(lhse->name);
-        if (!lhs_value_alloca) {
-            err_ = "Unknown variable name";
-            return nullptr;
-        }
-
-        builder_->CreateStore(rhs_value, lhs_value_alloca); */
         if (!symbol_table_.store(builder_.get(), lhse->name, rhs_value)) {
             err_ = "SymbolTable store " + lhse->name + "failed.";
             return nullptr;
@@ -412,13 +404,6 @@ llvm::Value* CodeGenerator::codegen(std::unique_ptr<BinaryExpr> e) {
 }
 
 llvm::Value* CodeGenerator::codegen(std::unique_ptr<VariableExpr> e) {
-/*     auto target = symbol_table_.find(e->name);
-    auto a = static_cast<llvm::AllocaInst*>(target);
-    if (!a) {
-        err_ = "Unknown variable name";
-        return nullptr;
-    }
-    return builder_->CreateLoad(a->getAllocatedType(), a, e->name.c_str()); */
     if (auto ret = symbol_table_.load(builder_.get(), e->name)) {
         return ret;
     }
@@ -519,7 +504,7 @@ llvm::Function* CodeGenerator::codegen(ProtoTypePtr p) {
     unsigned idx = 0;
     assert(function->arg_size() == p->args.size());
     for (auto& arg: function->args()) {
-        arg.setName(p->args[idx++]);
+        arg.setName(p->args[idx++].first);
     }
     return function;
 }

@@ -32,7 +32,7 @@ std::ostream& operator<<(std::ostream& os, const ProtoType& t) {
     if (!t.args.empty()) {
         os << "\t[Args]: " ;
         for (auto& arg: t.args) {
-            os << arg << ' ';
+            os << arg.first << ' ';
         }
     }
     return os;

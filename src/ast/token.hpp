@@ -11,6 +11,7 @@ enum class TokenType {
     Eof,
     Def, 
     Extern, 
+    Colon, // ':'
     Delimiter, //';'
     LeftParenthesis, // '('
     RightParenthesis, // ')'
@@ -52,6 +53,8 @@ public:
             os << "[Def]"; break;
         case TokenType::Extern:
             os << "[Extern]"; break;
+        case TokenType::Colon:
+            os << "[:]"; break;
         case TokenType::Delimiter:
             os << "[;]"; break;
         case TokenType::LeftParenthesis:

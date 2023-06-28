@@ -1,6 +1,7 @@
 #include "parser.hpp"
 #include "ast/ast.hpp"
 #include "ast/token.hpp"
+#include "ast/type.hpp"
 
 #include <algorithm>
 #include <cassert>
@@ -56,7 +57,7 @@ void Parser::parse_top_level_expression() {
 
     // std::cout << "Parsed a top-level expr." << std::endl;
     
-    auto proto = std::make_unique<ProtoType>("__anon_expr", std::vector<std::string>());
+    auto proto = std::make_unique<ProtoType>("__anon_expr", std::vector<TypeSystem::TypedInstanceName>());
     // ast_tree_.push_back(std::make_unique<ASTNode>(FunctionNode{std::move(proto), std::move(expression)}));
     ast_tree_.push_back(std::make_unique<ASTNode>(FunctionNode{std::move(proto), std::move(body)}));
 }
@@ -188,11 +189,20 @@ ProtoTypePtr Parser::parse_prototype() {
     }
 
     next_token();
-    std::vector<std::string> args{};
+    std::vector<TypeSystem::TypedInstanceName> args{};
     while (current_token_type() != TokenType::RightParenthesis) {
         if (current_token_type() == TokenType::Identifier) {
-            args.push_back((*token_iter_).get_string());
+            args.emplace_back((*token_iter_).get_string(), TypeSystem::Type::Error);
             next_token();
+            if (current_token_type() != TokenType::Colon) {
+                err_ = "Expected ':' before identifier";
+                return nullptr;
+            }
+            next_token(); // eat ':'
+            auto type = TypeSystem::get_type((*token_iter_).get_string());
+            args.back().second = type;
+            next_token(); // eat type
+
             if (current_token_type() == TokenType::Comma) {
                 next_token(); // eat ','
                 if (current_token_type() != TokenType::Identifier) {
@@ -281,43 +291,43 @@ ExpressionPtr Parser::parse_primary() {
     }
 }
 
-/// varexpr ::= ['var'|'val'] identifier ('=' expression)?
-//                    (',' identifier ('=' expression)?)*
+/// varexpr ::= ['var'|'val'] identifier ':' type ('=' expression)?
 ExpressionPtr Parser::parse_var_expr() {
     bool is_const = token_iter_->is_const();
     next_token(); // eat var
-    std::vector<std::pair<std::string, ExpressionPtr>> names;
 
-    // At least one variable name is required.
     if (current_token_type() != TokenType::Identifier) {
         err_ = "expected identifier after var";
         return nullptr;
     }
 
-    for (;;) {
-        std::string name = token_iter_->get_string();
-        next_token(); // eat identifier
+    std::string name = token_iter_->get_string();
+    next_token(); // eat identifier
 
-        ExpressionPtr init = nullptr;
-        if (current_token_type() == TokenType::Operator && token_iter_->get_string() == "=") {
-            next_token(); // eat the '=';
+    if (current_token_type() != TokenType::Colon) {
+        err_ = "expected colon after identifier";
+        return nullptr;
+    }
+    next_token(); // eat ':'
 
-            init = parse_expression();
-            if (!init) return nullptr;
-        }
+    if (current_token_type() != TokenType::Identifier) {
+        err_ = "expected type after colon";
+        return nullptr;
+    }
+    auto type =  TypeSystem::get_type(token_iter_->get_string());
+    next_token(); // eat type
 
-        names.emplace_back(name, std::move(init));
+    ExpressionPtr init = nullptr;
+    if (current_token_type() == TokenType::Operator && token_iter_->get_string() == "=") {
+        next_token(); // eat the '=';
 
-        if (current_token_type() != TokenType::Comma) break;
-        next_token(); // eat ','
-
-        if (current_token_type() != TokenType::Identifier) {
-            err_ = "expected identifier list after var";
-            return nullptr;
-        }
+        init = parse_expression();
+        if (!init) return nullptr;
     }
 
-    return std::make_unique<VarExpr>(std::move(names), is_const);
+    // names.emplace_back(name, std::move(init));
+
+    return std::make_unique<VarExpr>(type, name, std::move(init), is_const);
 }
 
 /// forexpr ::= 'for' '(' identifier '=' expr ',' expr (',' expr)? ')' { body }

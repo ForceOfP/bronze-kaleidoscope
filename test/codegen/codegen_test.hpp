@@ -28,8 +28,8 @@ void codegen_helper(std::vector<std::string>& target, std::vector<std::string>& 
 
 TEST(CODEGEN, single) {
     std::vector<std::string> target = {
-        "def f(x) { return x + x; }",
-        "extern sin(x)",
+        "def f(x: double) { return x + x; }",
+        "extern sin(x: double)",
         "exec 2 + 3"
     };
 
@@ -45,9 +45,9 @@ TEST(CODEGEN, single) {
 
 TEST(CODEGEN, optimize) {
     std::vector<std::string> target = {
-        "def g(x) { return 2 + 3 + x; }", // TODO(lbt): "x + 2 + 3" will break the constant folding, check what happened.
-        "def h(x, y) { return x * y + y * x; }",
-        "def i(x) {return (1 + 2 + x)*(x + (1 + 2));};",
+        "def g(x: double) { return 2 + 3 + x; }", // TODO(lbt): "x + 2 + 3" will break the constant folding, check what happened.
+        "def h(x: double, y: double) { return x * y + y * x; }",
+        "def i(x: double) {return (1 + 2 + x)*(x + (1 + 2));};",
     };
 
     std::vector<std::string> answer = {
@@ -62,7 +62,7 @@ TEST(CODEGEN, optimize) {
 
 TEST(CODEGEN, jit) {
     std::vector<std::string> target = {
-        "def f(x, y, z) {return x * y + z;}",
+        "def f(x: double, y: double, z: double) {return x * y + z;}",
         "exec f(4, 2, 3)",
         "exec f(1, 2, 3)"
     };
@@ -79,9 +79,9 @@ TEST(CODEGEN, jit) {
 
 TEST(CODEGEN, ext) {
     std::vector<std::string> target = {
-        "extern sin(x)",
-        "extern cos(x)",
-        "def f(x) {return sin(x) * sin(x) + cos(x) * cos(x);}",
+        "extern sin(x: double)",
+        "extern cos(x: double)",
+        "def f(x: double) {return sin(x) * sin(x) + cos(x) * cos(x);}",
         "exec f(1.0)",
         "exec f(4.0)"
     };
@@ -101,9 +101,9 @@ TEST(CODEGEN, ext) {
 
 TEST(CODEGEN, ifelse1) {
     std::vector<std::string> target = {
-        "def double(x) {return x + x;}",
-        "def triple(x) {return x * 3;}",
-        "def f(x) {if (x < 3) {return double(x);} else {return triple(x);}};",
+        "def double(x: double) {return x + x;}",
+        "def triple(x: double) {return x * 3;}",
+        "def f(x: double) {if (x < 3) {return double(x);} else {return triple(x);}};",
         "exec f(2)",
         "exec f(5)"
     };
@@ -122,9 +122,9 @@ TEST(CODEGEN, ifelse1) {
 
 TEST(CODEGEN, ifelse2) {
     std::vector<std::string> target = {
-        "def double(x) {return x + x;}",
-        "def triple(x) {return x * 3;}",
-        "def f(x) {return if (x < 3) {double(x)} else {triple(x)}};",
+        "def double(x: double) {return x + x;}",
+        "def triple(x: double) {return x * 3;}",
+        "def f(x: double) {return if (x < 3) {double(x)} else {triple(x)}};",
         "exec f(2)",
         "exec f(5)"
     };
@@ -143,7 +143,7 @@ TEST(CODEGEN, ifelse2) {
 
 TEST(CODEGEN, loop) {
     std::vector<std::string> target = {
-        "def sum(n) {var a = 0, b = 0; for (i = 0, i < n) {b = a + b; a = a + 1;} return b; }",
+        "def sum(n: double) {var a: double = 0; var b: double = 0; for (i = 0, i < n) {b = a + b; a = a + 1;} return b; }",
         "exec sum(100)",
     };
 
@@ -160,19 +160,19 @@ TEST(CODEGEN, oper) {
     std::vector<std::string> target = {
 /*         "def unary - (v) 0 - v;",
         "-(2+3)", */
-        "def unary ! (v) {if (v) {return 0;} else {return 1;}};",
+        "def unary ! (v: double) {if (v) {return 0;} else {return 1;}};",
         "exec !1",
         "exec !0",
-        "def binary | 5 (LHS, RHS) {if (LHS) {return 1;} else {if (RHS) {return 1;} else {return 0;}}};",
+        "def binary | 5 (LHS: double, RHS: double) {if (LHS) {return 1;} else {if (RHS) {return 1;} else {return 0;}}};",
         "exec 0|0",
         "exec 1|0",
-        "def binary & 6 (LHS, RHS) {if (!LHS) {return 0;} else {return !(!RHS);}};",
+        "def binary & 6 (LHS: double, RHS: double) {if (!LHS) {return 0;} else {return !(!RHS);}};",
         "exec 1&0",
         "exec 1&1",
-        "def binary > 10 (LHS, RHS) {return RHS < LHS;};",
+        "def binary > 10 (LHS: double, RHS: double) {return RHS < LHS;};",
         "exec 1 > 2",
         "exec 2 > 1",
-        "def binary == 9 (LHS, RHS) {return !(RHS < LHS | RHS > LHS);};",
+        "def binary == 9 (LHS: double, RHS: double) {return !(RHS < LHS | RHS > LHS);};",
         "exec 1 == 0",
         "exec 1 == 1",
     };
@@ -203,7 +203,7 @@ TEST(CODEGEN, oper) {
 
 TEST(CODEGEN, variant) {
     std::vector<std::string> target = {
-        "def fibi(x) {var a = 1, b = 1, c; for (i = 3, i < x) {c = a + b; a = b; b = c;} return b;};",
+        "def fibi(x: double) {var a: double = 1; var b: double = 1; var c: double; for (i = 3, i < x) {c = a + b; a = b; b = c;} return b;};",
         "exec fibi(10)",
     };
 
@@ -218,7 +218,7 @@ TEST(CODEGEN, variant) {
 
 TEST(CODEGEN, invariant) {
     std::vector<std::string> target = {
-        "def exp(x, n) {val a = x; var t = 1; for (i = 1, i < n) {t = t * a;} return t;};",
+        "def exp(x: double, n: double) {val a: double = x; var t: double = 1; for (i = 1, i < n) {t = t * a;} return t;};",
         "exec exp(10, 3)",
     };
 
