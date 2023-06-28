@@ -68,6 +68,8 @@ std::vector<Token> Lexer::tokenize(std::string target_) {
                         ans.emplace_back(TokenType::Var, true);
                     } else if (token_context == "return") {
                         ans.emplace_back(TokenType::Return);
+                    } else if (token_context == "exec") {
+                        ans.emplace_back(TokenType::Exec);
                     } else {
                         ans.emplace_back(TokenType::Identifier, std::string(token_context));
                     }

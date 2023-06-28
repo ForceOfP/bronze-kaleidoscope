@@ -25,8 +25,11 @@ std::vector<ASTNodePtr> Parser::parse() {
         case TokenType::Delimiter:
             next_token();
             break;
-        default:
+        case TokenType::Exec:
             parse_top_level_expression();
+            break;            
+        default:
+            parse_top_level_expression_tmp();
             break;
         }
         
@@ -41,6 +44,25 @@ std::vector<ASTNodePtr> Parser::parse() {
 
 /// top_level_expression ::= expression
 void Parser::parse_top_level_expression() {
+    next_token(); // eat exec;
+    auto expression = parse_expression();
+    if (!expression) {
+        return;
+    }
+
+    Body body = {};
+    auto ret = std::make_unique<ReturnExpr>(std::move(expression));
+    body.push_back(std::move(ret));
+
+    // std::cout << "Parsed a top-level expr." << std::endl;
+    
+    auto proto = std::make_unique<ProtoType>("__anon_expr", std::vector<std::string>());
+    // ast_tree_.push_back(std::make_unique<ASTNode>(FunctionNode{std::move(proto), std::move(expression)}));
+    ast_tree_.push_back(std::make_unique<ASTNode>(FunctionNode{std::move(proto), std::move(body)}));
+}
+
+/// top_level_expression ::= expression
+void Parser::parse_top_level_expression_tmp() {
     auto expression = parse_expression();
     if (!expression) {
         return;

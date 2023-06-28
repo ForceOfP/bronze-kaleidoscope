@@ -22,6 +22,7 @@ public:
 
     std::vector<ASTNodePtr> parse();
     void parse_top_level_expression();
+    void parse_top_level_expression_tmp();
     void parse_definition();
     void parse_extern();
 
@@ -51,5 +52,4 @@ private:
     TokenVecIter token_iter_;
     std::string err_;
     std::map<std::string, int>& operator_precedence_;
-    //std::map<std::string, unsigned> operator_precedence_ = {{"<", 10}, {"+", 20}, {"-", 20}, {"*", 40}};
 };

@@ -28,6 +28,7 @@ enum class TokenType {
     Unary,
     Var, // with a bool
     Return,
+    Exec,
     Init
 };
 
@@ -87,6 +88,8 @@ public:
             os << "[}]"; break;
         case TokenType::Return: 
             os << "[Return]"; break;
+        case TokenType::Exec: 
+            os << "[Exec]"; break;
         default:
             break;
         }
