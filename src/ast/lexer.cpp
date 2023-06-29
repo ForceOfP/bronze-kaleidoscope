@@ -19,6 +19,7 @@ std::vector<Token> Lexer::tokenize(std::string target_) {
         "(?P<opcur>{)|"
         "(?P<clcur>})|"
         "(?P<comma>,)|"
+        "(?P<answer>->)|"
         "(?P<operator>[!-'*-/:<-@\\^`|~][!-'*-/:<-@\\^`|~]?)"
     );
 
@@ -93,6 +94,8 @@ std::vector<Token> Lexer::tokenize(std::string target_) {
                     ans.emplace_back(TokenType::Comma);
                 } else if (token_tag == "operator") {
                     ans.emplace_back(TokenType::Operator, std::string(token_context));
+                } else if (token_tag == "answer") {
+                    ans.emplace_back(TokenType::Answer);
                 } else {
                     std::cerr << "Lexer parse error!" << '\n';
                     exit(1);

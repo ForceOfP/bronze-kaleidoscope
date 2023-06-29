@@ -11,12 +11,14 @@ namespace TypeSystem {
 enum class Type {
     Double,
     Int32,
-    Error
+    Void,
+    Uninit,
+    Error,
 };
 
 using TypedInstanceName = std::pair<std::string, Type>;
 
-Type get_type(std::string&& name);
+Type find_type(std::string&& name);
 llvm::Value* get_type_init_value(Type type, llvm::LLVMContext& context);
 
 }  // namespace TypeSystem

@@ -91,12 +91,18 @@ struct ReturnExpr: public Expression {
 struct ProtoType {
     std::string name;
     std::vector<std::pair<std::string, TypeSystem::Type>> args;
+    TypeSystem::Type answer;
     bool is_operator_;
     unsigned precedence_;
 
     ProtoType(std::string _name, std::vector<std::pair<std::string, TypeSystem::Type>> _args,
-                bool is_oper = false, unsigned prec = 0):
-        name(std::move(_name)), args(std::move(_args)), is_operator_(is_oper), precedence_(prec) {}
+                bool is_oper = false, unsigned prec = 0,
+                TypeSystem::Type answer_t = TypeSystem::Type::Uninit):
+        name(std::move(_name)), 
+        args(std::move(_args)), 
+        answer(answer_t), 
+        is_operator_(is_oper),
+        precedence_(prec) {}
 
     ProtoType(): name(""), args({}) {}
 

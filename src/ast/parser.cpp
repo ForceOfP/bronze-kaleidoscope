@@ -199,7 +199,7 @@ ProtoTypePtr Parser::parse_prototype() {
                 return nullptr;
             }
             next_token(); // eat ':'
-            auto type = TypeSystem::get_type((*token_iter_).get_string());
+            auto type = TypeSystem::find_type((*token_iter_).get_string());
             args.back().second = type;
             next_token(); // eat type
 
@@ -222,12 +222,23 @@ ProtoTypePtr Parser::parse_prototype() {
     }
     next_token(); // eat ')'
 
+    auto reture_type = TypeSystem::Type::Void;
+    if (current_token_type() == TokenType::Answer) {
+        next_token(); // eat '->'
+        if (current_token_type() != TokenType::Identifier) {
+            err_ = "Expected type before '->'";
+            return nullptr;
+        }
+        reture_type = TypeSystem::find_type((*token_iter_).get_string());
+        next_token(); // eat type
+    }
+
     if (kind && args.size() != kind) {
         err_ = "Invalid number of operands for operator";
         return nullptr;
     }
 
-    return std::make_unique<ProtoType>(name, args, kind != 0, binary_precedence);
+    return std::make_unique<ProtoType>(name, args, kind != 0, binary_precedence, reture_type);
 }
 
 /// binoprhs::= [operator primary]*
@@ -314,7 +325,7 @@ ExpressionPtr Parser::parse_var_expr() {
         err_ = "expected type after colon";
         return nullptr;
     }
-    auto type =  TypeSystem::get_type(token_iter_->get_string());
+    auto type =  TypeSystem::find_type(token_iter_->get_string());
     next_token(); // eat type
 
     ExpressionPtr init = nullptr;

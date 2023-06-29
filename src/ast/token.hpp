@@ -30,6 +30,7 @@ enum class TokenType {
     Var, // with a bool
     Return,
     Exec,
+    Answer, // means ->, such as "def f() -> double {...}"  
     Init
 };
 
@@ -93,6 +94,8 @@ public:
             os << "[Return]"; break;
         case TokenType::Exec: 
             os << "[Exec]"; break;
+        case TokenType::Answer: 
+            os << "[->]"; break;
         default:
             break;
         }

@@ -24,18 +24,18 @@ TEST(AST, tokenize) {
         "2.3",
         "abc",
         "2",
-        "; , ( ) + - * = += == { }",
+        "; , ( ) + - * = += == { } ->",
         "extern",
         "def f(x) x + x ###afeabgnan####",
         "for in if else",
-        "return 1"
+        "return 1",
     };
     std::vector<std::string> answer = {
         "[Def] [Ident: f] [(] [Ident: x] [)] [Ident: x] [Oper: +] [Ident: x]",
         "[Literal: 2.3]",
         "[Ident: abc]",
         "[Literal: 2]",
-        "[;] [,] [(] [)] [Oper: +] [Oper: -] [Oper: *] [Oper: =] [Oper: +=] [Oper: ==] [{] [}]",
+        "[;] [,] [(] [)] [Oper: +] [Oper: -] [Oper: *] [Oper: =] [Oper: +=] [Oper: ==] [{] [}] [->]",
         "[Extern]",
         "[Def] [Ident: f] [(] [Ident: x] [)] [Ident: x] [Oper: +] [Ident: x]",
         "[For] [In] [If] [Else]",

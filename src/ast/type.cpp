@@ -6,7 +6,7 @@
 
 using TypeSystem::Type;
 
-Type TypeSystem::get_type(std::string&& name) {
+Type TypeSystem::find_type(std::string&& name) {
     if (name == "double") {
         return Type::Double;
     } else if (name == "int32") {
