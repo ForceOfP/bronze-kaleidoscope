@@ -31,7 +31,7 @@ public:
 
     llvm::Value* codegen(Body b);
     llvm::Value* codegen(std::unique_ptr<ReturnExpr> e); // todo
-    llvm::Value* codegen(std::unique_ptr<VarExpr> e);
+    llvm::Value* codegen(std::unique_ptr<VarDeclareExpr> e);
     llvm::Value* codegen(std::unique_ptr<UnaryExpr> e);
     llvm::Value* codegen(std::unique_ptr<ForExpr> e);
     llvm::Value* codegen(std::unique_ptr<IfExpr> e);

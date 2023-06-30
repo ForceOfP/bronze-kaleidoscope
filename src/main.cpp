@@ -1,5 +1,6 @@
 #include "ast/lexer.hpp"
 #include "ast/parser.hpp"
+#include "ast/semantic.hpp"
 #include "ast/token.hpp"
 #include "codegen/codegen.hpp"
 #include "codegen/jit_codegen.hpp"
@@ -85,6 +86,14 @@ void driver(Stage stage) {
                     cout << *ast << endl;
                 }
             }
+            
+            TypeChecker checker;
+
+            for (auto& ast: asts) {
+                if (!checker.check(*ast)) {
+                    cout << "TypeChecker failed at " << *ast << endl;
+                }
+            }            
 
             generator->codegen(std::move(asts));
 

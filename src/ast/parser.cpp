@@ -53,7 +53,8 @@ void Parser::parse_top_level_expression() {
 
     Body body = {};
     auto ret = std::make_unique<ReturnExpr>(std::move(expression));
-    body.push_back(std::move(ret));
+    body.data.push_back(std::move(ret));
+    body.has_return_value = false;
 
     // std::cout << "Parsed a top-level expr." << std::endl;
     
@@ -81,7 +82,7 @@ void Parser::parse_definition() {
         return;
     } */
     auto body = parse_body();
-    if (body.empty() && !err_.empty()) {
+    if (!err_.empty()) {
         return;
     }
 
@@ -107,18 +108,38 @@ void Parser::parse_extern() {
 }
 
 /// body ::= (expression;)* return_expression;
-std::vector<ExpressionPtr> Parser::parse_body() {
-    std::vector<ExpressionPtr> body;
+Body Parser::parse_body() {
+    Body body;
+
+    bool returned = false;
     while (current_token_type() != TokenType::RightCurlyBrackets) {
         auto line = parse_expression();
         if (!line) {
             return {};
         }
         if (current_token_type() == TokenType::Delimiter) {
+            if (returned) {
+                err_ = "Expect non-delimiter at body end.";
+                return {};
+            }
             next_token(); // eat ';'
+            returned = false;
+        } else if (prev_token_is_right_curly_brackets()) {
+            if (returned) {
+                err_ = "Expect non-delimiter at body end.";
+                return {};
+            }
+            returned = false;            
+        }else {
+            if (returned) {
+                err_ = "Expect one non-delimiter at body.";
+                return {};
+            }
+            returned = true;
         }
-        body.push_back(std::move(line));
+        body.data.push_back(std::move(line));
     }
+    body.has_return_value = returned;
     return body;
 }
 
@@ -338,7 +359,7 @@ ExpressionPtr Parser::parse_var_expr() {
 
     // names.emplace_back(name, std::move(init));
 
-    return std::make_unique<VarExpr>(type, name, std::move(init), is_const);
+    return std::make_unique<VarDeclareExpr>(type, name, std::move(init), is_const);
 }
 
 /// forexpr ::= 'for' '(' identifier '=' expr ',' expr (',' expr)? ')' { body }
@@ -403,7 +424,7 @@ ExpressionPtr Parser::parse_for_expr() {
     next_token(); // eat '{'
 
     auto body = parse_body();
-    if (body.empty() && !err_.empty()) {
+    if (!err_.empty()) {
         return nullptr;
     }
 
@@ -449,7 +470,7 @@ ExpressionPtr Parser::parse_if_expr() {
     next_token(); // eat '{'
 
     auto then = parse_body();
-    if (then.empty() && !err_.empty()) return nullptr;
+    if (!err_.empty()) return nullptr;
 
     if (current_token_type() != TokenType::RightCurlyBrackets) {
         err_ = "expected token '}'";
@@ -469,7 +490,7 @@ ExpressionPtr Parser::parse_if_expr() {
     next_token(); // eat '{'
     
     auto _else = parse_body();
-    if (_else.empty() && !err_.empty()) return nullptr;
+    if (!err_.empty()) return nullptr;
     
     if (current_token_type() != TokenType::RightCurlyBrackets) {
         err_ = "expected token '}'";
@@ -588,4 +609,14 @@ int Parser::current_token_precedence() {
     } else {
         return -1;
     }
+}
+
+bool Parser::prev_token_is_right_curly_brackets() {
+    token_iter_--;
+    if (current_token_type() == TokenType::RightCurlyBrackets) {
+        token_iter_++;
+        return true;
+    }
+    token_iter_++;
+    return false;
 }

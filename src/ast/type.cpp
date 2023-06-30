@@ -25,3 +25,29 @@ llvm::Value* TypeSystem::get_type_init_value(Type type, llvm::LLVMContext& conte
         return nullptr;
     }
 }
+
+bool TypeSystem::is_same_type(Type a, Type b) {
+    if (a == Type::Any || b == Type::Any) {
+        return true;
+    } 
+    return a == b;
+}
+
+std::string TypeSystem::get_type_str(Type type) {
+    switch (type) {
+
+    case Type::Double:
+        return "double";
+    case Type::Int32:
+        return "i32";
+    case Type::Void:
+        return "void";
+    case Type::Uninit:
+        return "uninit";
+    case Type::Error:
+        return "error";
+    case Type::Any:
+        return "any";
+    }
+    return "";
+}

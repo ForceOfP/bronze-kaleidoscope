@@ -17,11 +17,21 @@ public:
 };
 
 using ExpressionPtr = std::unique_ptr<Expression>;
-using Body = std::vector<ExpressionPtr>;
+
+struct Body {
+    std::vector<ExpressionPtr> data;
+    bool has_return_value;
+    Body(std::vector<ExpressionPtr> body, bool _has_return_value): 
+        data(std::move(body)), has_return_value(_has_return_value) {}
+    Body() = default;
+};
+
+// using Body = std::vector<ExpressionPtr>;
 
 struct LiteralExpr: public Expression {
     double value;
-    explicit LiteralExpr(double d): value(d) {}
+    TypeSystem::Type type = TypeSystem::Type::Uninit;
+    explicit LiteralExpr(double d, TypeSystem::Type t = TypeSystem::Type::Uninit): value(d) {}
 };
 
 struct VariableExpr: public Expression {
@@ -71,13 +81,13 @@ struct UnaryExpr: public Expression {
         _operater(std::move(name)), operand(std::move(opnd)) {}
 };
 
-struct VarExpr: public Expression {    
+struct VarDeclareExpr: public Expression {    
     TypeSystem::Type type;
     std::string name;
     ExpressionPtr value;
     bool is_const;
 
-    explicit VarExpr(
+    explicit VarDeclareExpr(
         TypeSystem::Type _type, std::string _name, ExpressionPtr expr, bool _is_const):
         type(_type), name(std::move(_name)), value(std::move(expr)), is_const(_is_const) {}
 };

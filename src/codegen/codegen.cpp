@@ -131,7 +131,7 @@ llvm::Value* CodeGenerator::codegen(std::unique_ptr<ReturnExpr> e) {
     return nullptr;
 } 
 
-llvm::Value* CodeGenerator::codegen(std::unique_ptr<VarExpr> e) {
+llvm::Value* CodeGenerator::codegen(std::unique_ptr<VarDeclareExpr> e) {
     std::vector<llvm::AllocaInst*> old_bindings_{};
     llvm::Function* function = builder_->GetInsertBlock()->getParent();
 
@@ -268,7 +268,7 @@ llvm::Value* CodeGenerator::codegen(std::unique_ptr<ForExpr> e) {
 }
 
 llvm::Value* CodeGenerator::codegen(std::unique_ptr<IfExpr> e) {
-    assert(!e->then.empty() && !e->_else.empty());
+    assert(!e->then.data.empty() && !e->_else.data.empty());
     
     auto cond_value = codegen(std::move(e->condition));
     if (!cond_value) {
@@ -460,9 +460,9 @@ llvm::Value* CodeGenerator::codegen(std::unique_ptr<Expression> e) {
         return codegen(std::move(tmp));        
     }
 
-    auto var = dynamic_cast<VarExpr*>(raw);
+    auto var = dynamic_cast<VarDeclareExpr*>(raw);
     if (var) {
-        std::unique_ptr<VarExpr> tmp(var);
+        std::unique_ptr<VarDeclareExpr> tmp(var);
         return codegen(std::move(tmp));  
     }
 
@@ -478,14 +478,17 @@ llvm::Value* CodeGenerator::codegen(std::unique_ptr<Expression> e) {
 llvm::Value* CodeGenerator::codegen(Body b) {
     llvm::Value* tmp = nullptr;
 
-    for (auto& expr: b) {
+    for (auto& expr: b.data) {
         tmp = codegen(std::move(expr));
         if (!err_.empty()) {
             return nullptr;
         }
     }
-
-    return tmp;
+    if (b.has_return_value) {
+        return tmp;
+    } else {
+        return nullptr;
+    }
 }
 
 llvm::Function* CodeGenerator::codegen(ProtoTypePtr p) {
@@ -579,11 +582,7 @@ void CodeGenerator::codegen(std::vector<ASTNodePtr>&& ast_tree) {
             [&](FunctionNode& f) {
                 bool is_top = f.prototype->name == "__anon_expr";
                 if (is_top) {
-                    if (auto ir = codegen(f)) {
-                        ir->print(output_stream_);
-                    } else {
-                        output_stream_ << err_ << '\n';
-                    }
+                    output_stream_ << "shouldn't use exec without jit.\n";
                 } else {
                     if (auto ir = codegen(f)) {
                         if (setting_.print_ir) {

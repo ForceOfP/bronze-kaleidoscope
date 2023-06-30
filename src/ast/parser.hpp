@@ -25,7 +25,7 @@ public:
     void parse_definition();
     void parse_extern();
 
-    std::vector<ExpressionPtr> parse_body();
+    Body parse_body();
     ExpressionPtr parse_expression();
     ProtoTypePtr parse_prototype();
 
@@ -44,6 +44,7 @@ private:
     TokenType current_token_type() { return token_iter_->type_; }
     void next_token() { token_iter_++; }
     int current_token_precedence();
+    bool prev_token_is_right_curly_brackets();
 private:
     using TokenVecIter = std::vector<Token>::iterator;
     std::vector<Token> tokens_;

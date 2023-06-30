@@ -39,7 +39,7 @@ std::ostream& operator<<(std::ostream& os, const ProtoType& t) {
 }
 
 std::ostream& operator<<(std::ostream& os, const Body& body) {
-    for (const auto& line: body) {
+    for (const auto& line: body.data) {
         os << line;
     }
     return os;
@@ -82,7 +82,7 @@ std::ostream& operator<<(std::ostream& os, const ExpressionPtr& e) {
     if (u) {
         os << "\t\t[Unary]\n";   
     }
-    auto var = dynamic_cast<VarExpr*>(raw);
+    auto var = dynamic_cast<VarDeclareExpr*>(raw);
     if (var) {
         os << "\t\t[Var]\n";
     }

@@ -1,12 +1,16 @@
 #pragma once
 
+#include <cassert>
 #include <gtest/gtest.h>
+#include <iostream>
 #include <llvm/Support/raw_ostream.h>
+#include <string>
 #include <vector>
 
 #include "ast/ast.hpp"
 #include "ast/lexer.hpp"
 #include "ast/parser.hpp"
+#include "ast/semantic.hpp"
 #include "codegen/jit_codegen.hpp"
 
 void codegen_helper(std::vector<std::string>& target, std::vector<std::string>& answer) {
@@ -17,9 +21,18 @@ void codegen_helper(std::vector<std::string>& target, std::vector<std::string>& 
         .function_pass_optimize = true,
     };
     auto generator = JitCodeGenerator(output, setting);
+    TypeChecker checker;
+
     for (int i = 0; i < target.size(); i++) {
         auto parser = Parser(Lexer::tokenize(target[i]), generator.binary_oper_precedence_);
         auto asts = parser.parse();
+        for (auto& ast: asts) {
+            if (!checker.check(*ast)) {
+                std::cout << "TypeChecker failed at line " << i << std::endl;
+                std::cout << checker.err_ << std::endl;
+                assert(false);
+            }
+        }
         generator.codegen(std::move(asts));
         ASSERT_EQ(ans, answer[i]);
         ans.clear();
