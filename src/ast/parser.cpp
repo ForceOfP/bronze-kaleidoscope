@@ -314,7 +314,7 @@ ExpressionPtr Parser::parse_primary() {
     case TokenType::For:
         return parse_for_expr();
     case TokenType::Var:
-        return parse_var_expr();
+        return parse_var_declare_expr();
     case TokenType::Return:
         return parse_return_expr();
     default:
@@ -324,7 +324,7 @@ ExpressionPtr Parser::parse_primary() {
 }
 
 /// varexpr ::= ['var'|'val'] identifier ':' type ('=' expression)?
-ExpressionPtr Parser::parse_var_expr() {
+ExpressionPtr Parser::parse_var_declare_expr() {
     bool is_const = token_iter_->is_const();
     next_token(); // eat var
 
@@ -576,8 +576,20 @@ ExpressionPtr Parser::parse_identifier_expr() {
 
 /// literalexpr ::= literal
 ExpressionPtr Parser::parse_literal_expr() {
-    auto res = std::make_unique<LiteralExpr>((*token_iter_).get_literal());
+    double val = (*token_iter_).get_literal();
     next_token();
+    auto type = TypeSystem::Type::Uninit;
+    if (current_token_type() == TokenType::Colon) {
+        next_token(); // eat ':'
+
+        if (current_token_type() != TokenType::Identifier) {
+            err_ = "expected type after colon";
+            return nullptr;
+        }
+        type =  TypeSystem::find_type(token_iter_->get_string());
+        next_token(); // eat type        
+    }
+    auto res = std::make_unique<LiteralExpr>(val, type);
     return res;
 }
 

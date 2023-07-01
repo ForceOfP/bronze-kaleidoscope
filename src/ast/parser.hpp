@@ -33,7 +33,7 @@ public:
     ExpressionPtr parse_primary();
 
     ExpressionPtr parse_return_expr();
-    ExpressionPtr parse_var_expr();
+    ExpressionPtr parse_var_declare_expr();
     ExpressionPtr parse_unary();
     ExpressionPtr parse_if_expr();
     ExpressionPtr parse_for_expr();

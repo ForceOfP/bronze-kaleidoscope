@@ -230,18 +230,18 @@ bool TypeChecker::check(Expression* expr, TypeSystem::Type type) {
 }
 
 bool TypeChecker::check(LiteralExpr* expr, TypeSystem::Type type) {
-    if (TypeSystem::is_same_type(expr->type, TypeSystem::Type::Uninit)) {
+    if (expr->type == TypeSystem::Type::Uninit) {
         expr->type = type;
-        // std::cout << "Literal " << expr->value << " type is " << TypeSystem::get_type_str(type) << std::endl;
+        // std::cout << "Literal " << expr->value << " type is " << TypeSystem::get_type_str(expr->type) << std::endl;
         return true; 
     } else {
-        if (expr->type != type) {
+        if (!TypeSystem::is_same_type(expr->type, type)) {
             err_ += "Literal check error;";
             err_ += "found " + TypeSystem::get_type_str(expr->type);
             err_ += " expect " + TypeSystem::get_type_str(type) + ';';
             return false;
         } else {
-            // std::cout << "Literal " << expr->value << " type is " << TypeSystem::get_type_str(type) << std::endl;
+            // std::cout << "Literal " << expr->value << " type is " << TypeSystem::get_type_str(expr->type) << std::endl;
             return true;
         }
     }
@@ -324,7 +324,7 @@ bool TypeChecker::check(IfExpr* expr, TypeSystem::Type type) {
         return false; 
     }
 
-    if (!check(expr->condition.get(), type)) {
+    if (!check(expr->condition.get(), TypeSystem::Type::Any)) {
         err_ += "condition type check error;";
         return false;
     }

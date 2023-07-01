@@ -30,8 +30,8 @@ struct Body {
 
 struct LiteralExpr: public Expression {
     double value;
-    TypeSystem::Type type = TypeSystem::Type::Uninit;
-    explicit LiteralExpr(double d, TypeSystem::Type t = TypeSystem::Type::Uninit): value(d) {}
+    TypeSystem::Type type;
+    explicit LiteralExpr(double d, TypeSystem::Type t): value(d), type(t) {}
 };
 
 struct VariableExpr: public Expression {
