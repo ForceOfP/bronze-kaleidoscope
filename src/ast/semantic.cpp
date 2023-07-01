@@ -230,6 +230,12 @@ bool TypeChecker::check(Expression* expr, TypeSystem::Type type) {
 }
 
 bool TypeChecker::check(LiteralExpr* expr, TypeSystem::Type type) {
+    if (anonymous_binary_status_ == AgainstStatus::Checked) {
+        expr->type = anonymous_binary_type_;
+        // std::cout << "Literal " << expr->value << " type is " << TypeSystem::get_type_str(expr->type) << std::endl;
+        return true;
+    }
+    
     if (expr->type == TypeSystem::Type::Uninit) {
         expr->type = type;
         // std::cout << "Literal " << expr->value << " type is " << TypeSystem::get_type_str(expr->type) << std::endl;
@@ -248,7 +254,13 @@ bool TypeChecker::check(LiteralExpr* expr, TypeSystem::Type type) {
 }
 
 bool TypeChecker::check(VariableExpr* expr, TypeSystem::Type type) {
-    if (TypeSystem::is_same_type(symbol_table_.find_symbol_type(expr->name), type)) {
+    auto _type = symbol_table_.find_symbol_type(expr->name);
+    if (TypeSystem::is_same_type(_type, type)) {
+        if (anonymous_binary_status_ == AgainstStatus::Checking) {
+            if (anonymous_binary_type_ == TypeSystem::Type::Any) {
+                anonymous_binary_type_ = _type;
+            }
+        }
         return true;
     } else {
         err_ += "variable type check error;";
@@ -297,11 +309,17 @@ bool TypeChecker::check(CallExpr* expr, TypeSystem::Type type) {
         return false;
     }
     auto iter = target_function.begin();
-    if (*iter != type) {
+    if (!TypeSystem::is_same_type(*iter, type)) {
         err_ += "function return type check error;";
         return false;
     }
     
+    if (anonymous_binary_status_ == AgainstStatus::Checking) {
+        if (anonymous_binary_type_ == TypeSystem::Type::Any) {
+            anonymous_binary_type_ = *iter;
+        }
+    }
+
     iter++;
     for (auto& arg: expr->args) {
         if (!check(arg.get(), *iter)) {
@@ -324,10 +342,23 @@ bool TypeChecker::check(IfExpr* expr, TypeSystem::Type type) {
         return false; 
     }
 
-    if (!check(expr->condition.get(), TypeSystem::Type::Any)) {
+/*     if (!check(expr->condition.get(), TypeSystem::Type::Any)) {
         err_ += "condition type check error;";
         return false;
+    } */
+    anonymous_binary_type_ = TypeSystem::Type::Any;
+    anonymous_binary_status_ = AgainstStatus::Init;
+    
+    if (!check_anonymous_expression(expr->condition.get())) {
+        err_ += "condition body type check error;";
+        return false;
+    } else {
+        if (!check_anonymous_expression(expr->condition.get())) {
+            err_ += "condition body type check-against error;";
+            return false;
+        } 
     }
+    anonymous_binary_status_ = AgainstStatus::Init;
 
     return true;
 }
@@ -362,4 +393,45 @@ bool TypeChecker::check(ReturnExpr* expr, TypeSystem::Type type) {
         return false;        
     }
     return true;
+}
+
+bool TypeChecker::check_anonymous_expression(Expression* expr) {
+    switch (anonymous_binary_status_) {
+    case AgainstStatus::Init:
+        anonymous_binary_status_ = AgainstStatus::Checking;
+        break;
+    case AgainstStatus::Checking:
+        anonymous_binary_status_ = AgainstStatus::Checked;
+        break;
+    case AgainstStatus::Checked:
+        break;
+    }
+
+    auto l = dynamic_cast<LiteralExpr*>(expr);
+    if (l) {
+        return true;
+    }
+
+    auto c = dynamic_cast<CallExpr*>(expr);
+    if (c) {
+        return true;
+    }
+    
+    auto v = dynamic_cast<VariableExpr*>(expr);
+    if (v) {
+        return true;
+    }
+    
+    auto b = dynamic_cast<BinaryExpr*>(expr);
+    if (b) {
+        return check(b, TypeSystem::Type::Any);
+    }
+
+    auto u = dynamic_cast<UnaryExpr*>(expr);
+    if (u) {
+        return check(u, TypeSystem::Type::Any);
+    }
+
+    err_ = "if-condition check error;";
+    return false;
 }

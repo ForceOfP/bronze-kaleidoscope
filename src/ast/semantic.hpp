@@ -40,9 +40,15 @@ public:
     bool check(UnaryExpr* expr, TypeSystem::Type type);
     bool check(VarDeclareExpr* expr, TypeSystem::Type type);
     bool check(ReturnExpr* expr, TypeSystem::Type type);
+
+    bool check_anonymous_expression(Expression* expr);
 public:
     std::string err_;
 private:
+    enum class AgainstStatus {Init, Checking, Checked};
+    AgainstStatus anonymous_binary_status_;
+    TypeSystem::Type anonymous_binary_type_;
+
     Semantic::NaiveSymbolTable symbol_table_;
     std::unordered_map<std::string, std::vector<TypeSystem::Type>> function_table_;
     TypeSystem::Type return_type_;

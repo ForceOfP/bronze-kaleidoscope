@@ -116,7 +116,8 @@ TEST(CODEGEN, ifelse1) {
     std::vector<std::string> target = {
         "def double(x: double) -> double {return x + x;}",
         "def triple(x: double) -> double {return x * 3;}",
-        "def f(x: double) -> double {if (x < 3: double) {return double(x);} else {return triple(x);}};",
+        // "def f(x: double) -> double {if (x < 3: double) {return double(x);} else {return triple(x);}};",
+        "def f(x: double) -> double {if (x < 3) {return double(x);} else {return triple(x);}};",
         "exec f(2)",
         "exec f(5)"
     };
@@ -137,7 +138,8 @@ TEST(CODEGEN, ifelse2) {
     std::vector<std::string> target = {
         "def double(x: double) -> double {return x + x;}",
         "def triple(x: double) -> double {return x * 3;}",
-        "def f(x: double) -> double {return if (x < 3: double) {double(x)} else {triple(x)}};",
+        // "def f(x: double) -> double {return if (x < 3: double) {double(x)} else {triple(x)}};",
+        "def f(x: double) -> double {return if (x < 3) {double(x)} else {triple(x)}};",
         "exec f(2)",
         "exec f(5)"
     };
