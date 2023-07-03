@@ -43,7 +43,7 @@ TEST(CODEGEN, single) {
     std::vector<std::string> target = {
         "def f(x: double) -> double { return x + x; }",
         "extern sin(x: double) -> double",
-        "exec 2 + 3"
+        "exec: double 2 + 3"
     };
 
     std::vector<std::string> answer = {
@@ -158,7 +158,7 @@ TEST(CODEGEN, ifelse2) {
 
 TEST(CODEGEN, loop) {
     std::vector<std::string> target = {
-        "def sum(n: double) -> double {var a: double = 0; var b: double = 0; for (i = 0, i < n) {b = a + b; a = a + 1;} return b; }",
+        "def sum(n: double) -> double {var a: double = 0; var b: double = 0; for (i = 0: double, i < n) {b = a + b; a = a + 1;} return b; }",
         "exec sum(100)",
     };
 
@@ -176,20 +176,20 @@ TEST(CODEGEN, oper) {
 /*         "def unary - (v) 0 - v;",
         "-(2+3)", */
         "def unary ! (v: double) -> double {if (v) {return 0;} else {return 1;}};",
-        "exec !1",
-        "exec !0",
+        "exec: double !1",
+        "exec: double !0",
         "def binary | 5 (LHS: double, RHS: double) -> double {if (LHS) {return 1;} else {if (RHS) {return 1;} else {return 0;}}};",
-        "exec 0|0",
-        "exec 1|0",
+        "exec: double 0|0",
+        "exec: double 1|0",
         "def binary & 6 (LHS: double, RHS: double) -> double {if (!LHS) {return 0;} else {return !(!RHS);}};",
-        "exec 1&0",
-        "exec 1&1",
+        "exec: double 1&0",
+        "exec: double 1&1",
         "def binary > 10 (LHS: double, RHS: double) -> double {return RHS < LHS;};",
-        "exec 1 > 2",
-        "exec 2 > 1",
+        "exec: double 1 > 2",
+        "exec: double 2 > 1",
         "def binary == 9 (LHS: double, RHS: double) -> double {return !(RHS < LHS | RHS > LHS);};",
-        "exec 1 == 0",
-        "exec 1 == 1",
+        "exec: double 1 == 0",
+        "exec: double 1 == 1",
     };
 
     std::vector<std::string> answer = {
@@ -218,7 +218,7 @@ TEST(CODEGEN, oper) {
 
 TEST(CODEGEN, variant) {
     std::vector<std::string> target = {
-        "def fibi(x: double) -> double {var a: double = 1; var b: double = 1; var c: double; for (i = 3, i < x) {c = a + b; a = b; b = c;} return b;};",
+        "def fibi(x: double) -> double {var a: double = 1; var b: double = 1; var c: double; for (i = 3: double, i < x) {c = a + b; a = b; b = c;} return b;};",
         "exec fibi(10)",
     };
 
@@ -233,13 +233,43 @@ TEST(CODEGEN, variant) {
 
 TEST(CODEGEN, invariant) {
     std::vector<std::string> target = {
-        "def exp(x: double, n: double) -> double {val a: double = x; var t: double = 1; for (i = 1, i < n) {t = t * a;} return t;};",
+        "def exp(x: double, n: double) -> double {val a: double = x; var t: double = 1; for (i = 1: double, i < n) {t = t * a;} return t;};",
         "exec exp(10, 3)",
     };
 
     std::vector<std::string> answer = {
         "parsed definition.\n",
         "1000.000000\n",
+    };
+
+    assert(target.size() == answer.size());
+    codegen_helper(target, answer);
+}
+
+TEST(CODEGEN, loopInt) {
+    std::vector<std::string> target = {
+        "def sum(n: double) -> i32 {var a: i32 = 0; var b: i32 = 0; for (i = 0: double, i < n) {b = a + b; a = a + 1;} return b; }",
+        "exec sum(100)",
+    };
+
+    std::vector<std::string> answer = {
+        "parsed definition.\n",
+        "5050\n",
+    };
+
+    assert(target.size() == answer.size());
+    codegen_helper(target, answer);
+}
+
+TEST(CODEGEN, addInt) {
+    std::vector<std::string> target = {
+        "def myadd(n: i32) -> i32 {return n+1;}",
+        "exec myadd(100)",
+    };
+
+    std::vector<std::string> answer = {
+        "parsed definition.\n",
+        "101\n",
     };
 
     assert(target.size() == answer.size());

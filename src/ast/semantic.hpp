@@ -41,7 +41,10 @@ public:
     bool check(VarDeclareExpr* expr, TypeSystem::Type type);
     bool check(ReturnExpr* expr, TypeSystem::Type type);
 
+    // check against
     bool check_anonymous_expression(Expression* expr);
+    void let_all_literal_typed(Expression* expr, TypeSystem::Type type);
+    void let_all_literal_typed(CallExpr* expr);
 public:
     std::string err_;
 private:
@@ -51,6 +54,6 @@ private:
 
     Semantic::NaiveSymbolTable symbol_table_;
     std::unordered_map<std::string, std::vector<TypeSystem::Type>> function_table_;
-    TypeSystem::Type return_type_;
+    TypeSystem::Type result_type_;
 };
 

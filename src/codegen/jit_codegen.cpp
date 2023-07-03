@@ -46,6 +46,7 @@ void JitCodeGenerator::codegen(std::vector<ASTNodePtr>&& ast_tree) {
             [&](FunctionNode& f) {
                 bool is_top = f.prototype->name == "__anon_expr";
                 if (is_top) {
+                    auto result_type = f.prototype->answer;
                     if (auto ir = CodeGenerator::codegen(f)) {
                         auto rt = jit_->get_main_jit_dylib().createResourceTracker();
                         auto tsm = llvm::orc::ThreadSafeModule(
@@ -57,9 +58,21 @@ void JitCodeGenerator::codegen(std::vector<ASTNodePtr>&& ast_tree) {
 
                         auto expr_symbol = exit_on_error_(jit_->lookup("__anon_expr"));
                         auto address = expr_symbol.getAddress();
-                        auto fp = llvm::jitTargetAddressToPointer<double (*)()>(address);
-                        
-                        output_stream_ << std::to_string(fp()) << '\n';
+                        switch (result_type) {
+                        case TypeSystem::Type::Int32: {
+                            auto functor_int = llvm::jitTargetAddressToPointer<int (*)()>(address);
+                            output_stream_ << std::to_string(functor_int()) << '\n';
+                            break;
+                        }
+                        case TypeSystem::Type::Double: {
+                            auto functor_double = llvm::jitTargetAddressToPointer<double (*)()>(address);
+                            output_stream_ << std::to_string(functor_double()) << '\n';
+                            break;
+                        }
+                        default:
+                            break;
+                        }
+
                         exit_on_error_(rt->remove());
                     } else {
                         output_stream_ << err_ << '\n';
@@ -113,7 +126,10 @@ llvm::Value* JitCodeGenerator::codegen(std::unique_ptr<BinaryExpr> e) {
 
     auto type = r->getType();
     if (type != l->getType()) {
-        err_ = "binary operator with two different type";
+        err_ = "binary operator with two different type, left is " 
+                + std::string(l->getName()) 
+                + ", right is "
+                + std::string(r->getName());
         return nullptr;
     }
 

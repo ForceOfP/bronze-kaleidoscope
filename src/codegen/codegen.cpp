@@ -1,5 +1,10 @@
 #include "codegen.hpp"
 
+#include <iostream>
+#include <llvm-15/llvm/ADT/APInt.h>
+#include <llvm-15/llvm/IR/Constant.h>
+#include <llvm-15/llvm/IR/Constants.h>
+#include <llvm-15/llvm/IR/Type.h>
 #include <llvm/ADT/Optional.h>
 #include <llvm/Support/CodeGen.h>
 #include <llvm/Support/FileSystem.h>
@@ -112,9 +117,17 @@ CodeGenerator::CodeGenerator(llvm::raw_ostream& os, CodeGeneratorSetting setting
     }
 }
 
-llvm::AllocaInst* CodeGenerator::create_entry_block_alloca(llvm::Function* function, const std::string& var_name) {
+llvm::AllocaInst* CodeGenerator::create_entry_block_alloca(
+    llvm::Function* function, const std::string& var_name, TypeSystem::Type type) {
     llvm::IRBuilder<> builder(&function->getEntryBlock(), function->getEntryBlock().begin());
-    return builder.CreateAlloca(llvm::Type::getDoubleTy(*context_), nullptr, var_name);
+    auto llvm_type = TypeSystem::get_llvm_type(type, *context_);
+    return builder.CreateAlloca(llvm_type, nullptr, var_name);
+}
+
+llvm::AllocaInst* CodeGenerator::create_entry_block_alloca(llvm::Function* function,
+                                                const std::string& var_name, llvm::Type* llvm_type) {
+    llvm::IRBuilder<> builder(&function->getEntryBlock(), function->getEntryBlock().begin());
+    return builder.CreateAlloca(llvm_type, nullptr, var_name);
 }
 
 llvm::Value* CodeGenerator::codegen(std::unique_ptr<ReturnExpr> e) {
@@ -148,7 +161,7 @@ llvm::Value* CodeGenerator::codegen(std::unique_ptr<VarDeclareExpr> e) {
             return nullptr;
         }
     } else { // If not specified, use 0.0.
-        init_value = TypeSystem::get_type_init_value(var_type, *context_);
+        init_value = TypeSystem::get_type_init_llvm_value(var_type, *context_);
     }
 
     if (e->is_const) {
@@ -157,7 +170,7 @@ llvm::Value* CodeGenerator::codegen(std::unique_ptr<VarDeclareExpr> e) {
         }
         symbol_table_.add_constant(var_name, init_value);
     } else {
-        llvm::AllocaInst* alloca = create_entry_block_alloca(function, var_name);
+        llvm::AllocaInst* alloca = create_entry_block_alloca(function, var_name, e->type);
         builder_->CreateStore(init_value, alloca);
         
         symbol_table_.add_variant(var_name, alloca);
@@ -198,7 +211,7 @@ llvm::Value* CodeGenerator::codegen(std::unique_ptr<UnaryExpr> e) {
 // outloop:
 llvm::Value* CodeGenerator::codegen(std::unique_ptr<ForExpr> e) {
     llvm::Function* function = builder_->GetInsertBlock()->getParent();
-    llvm::AllocaInst* alloca = create_entry_block_alloca(function, e->var_name);
+    llvm::AllocaInst* alloca = create_entry_block_alloca(function, e->var_name, TypeSystem::Type::Double);
 
     auto start_value = codegen(std::move(e->start));
     if (!start_value) {
@@ -316,12 +329,12 @@ llvm::Value* CodeGenerator::codegen(std::unique_ptr<IfExpr> e) {
         else_block = builder_->GetInsertBlock();
     }
 
-    if (else_value && then_value) {
+    if (else_value && then_value && else_value->getType() == then_value->getType()) {
         auto& merge_inserting_blocks = function->getBasicBlockList();
         merge_inserting_blocks.insert(function->end(), merge_block);
 
         builder_->SetInsertPoint(merge_block);
-        llvm::PHINode* phi = builder_->CreatePHI(llvm::Type::getDoubleTy(*context_), 2, "iftmp");
+        llvm::PHINode* phi = builder_->CreatePHI(else_value->getType(), 2, "iftmp");
 
         phi->addIncoming(then_value, then_block);
         phi->addIncoming(else_value, else_block);
@@ -388,7 +401,10 @@ llvm::Value* CodeGenerator::codegen(std::unique_ptr<BinaryExpr> e) {
 
     auto type = r->getType();
     if (type != l->getType()) {
-        err_ = "binary operator with two different type";
+        err_ = "binary operator with two different type, left is " 
+                + std::string(l->getName()) 
+                + ", right is "
+                + std::string(r->getName());
         return nullptr;
     }
 
@@ -413,7 +429,18 @@ llvm::Value* CodeGenerator::codegen(std::unique_ptr<VariableExpr> e) {
 }
 
 llvm::Value* CodeGenerator::codegen(std::unique_ptr<LiteralExpr> e) {
-    return llvm::ConstantFP::get(*context_, llvm::APFloat(e->value));
+    switch (e->type) {
+    case TypeSystem::Type::Double:
+        return llvm::ConstantFP::get(*context_, llvm::APFloat(e->value));
+    case TypeSystem::Type::Int32:
+        return llvm::ConstantInt::get(*context_, llvm::APInt(32, static_cast<int>(e->value)));
+    case TypeSystem::Type::Void:
+        return nullptr;
+    default:
+        err_ = "cannot infer type of literal " + std::to_string(e->value);
+        return nullptr;
+    }
+    // return llvm::ConstantFP::get(*context_, llvm::APFloat(e->value));
 }
 
 llvm::Value* CodeGenerator::codegen(std::unique_ptr<Expression> e) {
@@ -494,9 +521,12 @@ llvm::Value* CodeGenerator::codegen(Body b) {
 llvm::Function* CodeGenerator::codegen(ProtoTypePtr p) {
     assert(p);
 
-    // all types are double, like double(double, double) etc.a
-    std::vector<llvm::Type*> arg_types(p->args.size(), llvm::Type::getDoubleTy(*context_));
-    llvm::FunctionType* function_type = llvm::FunctionType::get(llvm::Type::getDoubleTy(*context_), arg_types, false);
+    std::vector<llvm::Type*> arg_types;
+    for (auto& arg: p->args) {
+        arg_types.push_back(TypeSystem::get_llvm_type(arg.second, *context_));
+    }
+    auto result_type = TypeSystem::get_llvm_type(p->answer, *context_);
+    llvm::FunctionType* function_type = llvm::FunctionType::get(result_type, arg_types, false);
     llvm::Function* function = llvm::Function::Create(
         function_type, 
         llvm::Function::ExternalLinkage,
@@ -531,7 +561,7 @@ llvm::Function* CodeGenerator::codegen(FunctionNode& f) {
     symbol_table_.step();
     for (auto& arg: function->args()) {
         // Create an alloca for this variable.
-        auto alloca = create_entry_block_alloca(function, std::string(arg.getName()));
+        auto alloca = create_entry_block_alloca(function, std::string(arg.getName()), arg.getType());
 
         // Store the initial value into the alloca.
         builder_->CreateStore(&arg, alloca);
@@ -540,7 +570,7 @@ llvm::Function* CodeGenerator::codegen(FunctionNode& f) {
     }
 
     return_block = llvm::BasicBlock::Create(*context_, "return");
-    ret_alloca = create_entry_block_alloca(function, "alloca");
+    ret_alloca = create_entry_block_alloca(function, "retAlloca", f.prototype->answer);
     auto& return_inserting_blocks = function->getBasicBlockList();
     return_inserting_blocks.insert(function->end(), return_block); 
 

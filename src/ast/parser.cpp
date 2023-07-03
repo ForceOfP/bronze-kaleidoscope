@@ -46,6 +46,19 @@ std::vector<ASTNodePtr> Parser::parse() {
 /// top_level_expression ::= expression
 void Parser::parse_top_level_expression() {
     next_token(); // eat exec;
+
+    auto result_type = TypeSystem::Type::Uninit;
+
+    if (current_token_type() == TokenType::Colon) {
+        next_token(); // eat ':'
+        if (current_token_type() != TokenType::Identifier) {
+            err_ = "expect type-id before 'exec:'";
+            return;
+        }
+        result_type = TypeSystem::find_type(token_iter_->get_string());
+        next_token();
+    }
+
     auto expression = parse_expression();
     if (!expression) {
         return;
@@ -59,7 +72,7 @@ void Parser::parse_top_level_expression() {
     // std::cout << "Parsed a top-level expr." << std::endl;
     
     auto proto = std::make_unique<ProtoType>("__anon_expr", std::vector<TypeSystem::TypedInstanceName>());
-    // ast_tree_.push_back(std::make_unique<ASTNode>(FunctionNode{std::move(proto), std::move(expression)}));
+    proto->answer = result_type; 
     ast_tree_.push_back(std::make_unique<ASTNode>(FunctionNode{std::move(proto), std::move(body)}));
 }
 

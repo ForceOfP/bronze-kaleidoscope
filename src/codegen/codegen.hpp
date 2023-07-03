@@ -14,6 +14,7 @@
 #include <unordered_map>
 
 #include "ast/ast.hpp"
+#include "ast/type.hpp"
 #include "jit_engine.hpp"
 #include "operator_function.hpp"
 #include "symbol_table.hpp"
@@ -54,8 +55,9 @@ public:
 protected:
     llvm::Function* get_function(std::string& name);
     llvm::AllocaInst* create_entry_block_alloca(llvm::Function* function,
-                                                const std::string& var_name);
-
+                                                const std::string& var_name, TypeSystem::Type type);
+    llvm::AllocaInst* create_entry_block_alloca(llvm::Function* function,
+                                                const std::string& var_name, llvm::Type* type);
 protected:
     std::unique_ptr<llvm::LLVMContext> context_;
     std::unique_ptr<llvm::IRBuilder<>> builder_;

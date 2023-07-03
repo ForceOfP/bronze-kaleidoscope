@@ -3,6 +3,7 @@
 #include "ast/type.hpp"
 #include <cstdlib>
 #include <iostream>
+#include <string>
 #include <vector>
 
 namespace Semantic {
@@ -50,6 +51,35 @@ bool TypeChecker::check(ASTNode& node) {
         }, 
         [&](FunctionNode& f) -> bool {
             if (f.prototype->name == "__anon_expr") {
+                auto ret = f.body.data.front().get();
+                auto ret_cast = dynamic_cast<ReturnExpr*>(ret);
+                auto command = ret_cast->ret.get();
+                if (f.prototype->answer != TypeSystem::Type::Uninit) {
+                    if (check(command, f.prototype->answer)) {
+                        let_all_literal_typed(command, f.prototype->answer);
+                        return true;
+                    } else {
+                        return false;
+                    }
+                }
+
+                anonymous_binary_type_ = TypeSystem::Type::Any;
+                anonymous_binary_status_ = AgainstStatus::Init;
+                if (!check_anonymous_expression(command)) {
+                    err_ += "execution body type check error;";
+                    return false;
+                    if (!check_anonymous_expression(command)) {
+                        err_ += "execution body type check error;";
+                        return false;
+                    }
+                }
+                if (anonymous_binary_type_ == TypeSystem::Type::Any) {
+                    err_ += "cannot infer execution result type;";
+                    return false;                    
+                }
+                f.prototype->answer = anonymous_binary_type_;
+                let_all_literal_typed(command, f.prototype->answer);
+                anonymous_binary_status_ = AgainstStatus::Init;
                 return true;
             }
             std::vector<TypeSystem::Type> types {};
@@ -60,9 +90,9 @@ bool TypeChecker::check(ASTNode& node) {
             }
             function_table_[f.prototype->name] = types;
 
-            auto return_type = f.prototype->answer;
-            return_type_ = return_type;
-            return check(f.body, return_type);
+            auto result_type = f.prototype->answer;
+            result_type_ = result_type;
+            return check(f.body, result_type);
         }
     );
 }
@@ -115,7 +145,7 @@ bool TypeChecker::check(const Body& body, TypeSystem::Type type) {
 
         auto r = dynamic_cast<ReturnExpr*>(expr);
         if (r) {
-            valid = check(r, return_type_);
+            valid = check(r, result_type_);
         }
 
         if (!valid) {
@@ -168,7 +198,7 @@ bool TypeChecker::check(const Body& body, TypeSystem::Type type) {
 
         auto r = dynamic_cast<ReturnExpr*>(expr);
         if (r) {
-            valid = check(r, return_type_);
+            valid = check(r, result_type_);
         }
 
         if (!valid) {
@@ -222,7 +252,7 @@ bool TypeChecker::check(Expression* expr, TypeSystem::Type type) {
 
     auto r = dynamic_cast<ReturnExpr*>(expr);
     if (r) {
-        return check(r, return_type_);
+        return check(r, result_type_);
     }
 
     err_ += "no expression find;";
@@ -286,7 +316,11 @@ bool TypeChecker::check(BinaryExpr* expr, TypeSystem::Type type) {
             err_ += "no rhs;";
             return false;
         }
-        return check(expr->rhs.get(), type);
+        if (check(expr->rhs.get(), type)) {
+            let_all_literal_typed(expr->rhs.get(), type);
+            return true;
+        }
+        return false;
     }
 
     if (!(expr->lhs && check(expr->lhs.get(), type))) {
@@ -305,7 +339,7 @@ bool TypeChecker::check(BinaryExpr* expr, TypeSystem::Type type) {
 bool TypeChecker::check(CallExpr* expr, TypeSystem::Type type) {
     auto& target_function = function_table_[expr->callee];
     if (target_function.size() - 1 != expr->args.size()) {
-        err_ += "function args size no match;";
+        err_ += "function args size not match, expect " + std::to_string(target_function.size() - 1) + " but " + std::to_string(expr->args.size()) + ';';
         return false;
     }
     auto iter = target_function.begin();
@@ -328,6 +362,8 @@ bool TypeChecker::check(CallExpr* expr, TypeSystem::Type type) {
             return false;
         }
     }
+
+    let_all_literal_typed(expr);
     return true;
 }
 
@@ -364,6 +400,10 @@ bool TypeChecker::check(IfExpr* expr, TypeSystem::Type type) {
 }
 
 bool TypeChecker::check(ForExpr* expr, TypeSystem::Type type) {
+    if (!check(expr->body, type)) {
+        err_ += "loop body type check error;";
+        return false;        
+    }
     return true;
 }
 
@@ -384,6 +424,7 @@ bool TypeChecker::check(UnaryExpr* expr, TypeSystem::Type type) {
 
 bool TypeChecker::check(VarDeclareExpr* expr, TypeSystem::Type type) {
     symbol_table_.add_symbol(expr->name, expr->type);
+    let_all_literal_typed(expr->value.get(), expr->type);
     return true;
 }
 
@@ -392,6 +433,7 @@ bool TypeChecker::check(ReturnExpr* expr, TypeSystem::Type type) {
         err_ += "return type check error;";
         return false;        
     }
+    let_all_literal_typed(expr->ret.get(), type);
     return true;
 }
 
@@ -414,7 +456,7 @@ bool TypeChecker::check_anonymous_expression(Expression* expr) {
 
     auto c = dynamic_cast<CallExpr*>(expr);
     if (c) {
-        return true;
+        return check(c, TypeSystem::Type::Any);
     }
     
     auto v = dynamic_cast<VariableExpr*>(expr);
@@ -432,6 +474,41 @@ bool TypeChecker::check_anonymous_expression(Expression* expr) {
         return check(u, TypeSystem::Type::Any);
     }
 
-    err_ = "if-condition check error;";
+    err_ = "anonymous expression check error;";
     return false;
+}
+
+void TypeChecker::let_all_literal_typed(Expression* expr, TypeSystem::Type type) {
+    auto l = dynamic_cast<LiteralExpr*>(expr);
+    if (l) {
+        l->type = type;
+        return;
+    }
+        
+    auto b = dynamic_cast<BinaryExpr*>(expr);
+    if (b) {
+        let_all_literal_typed(b->lhs.get(), type);
+        let_all_literal_typed(b->rhs.get(), type);
+    }
+
+    auto u = dynamic_cast<UnaryExpr*>(expr);
+    if (u) {
+        let_all_literal_typed(u->operand.get(), type);
+    }
+
+    auto c = dynamic_cast<CallExpr*>(expr);
+    if (c) {
+        let_all_literal_typed(c);
+    }
+
+    return;    
+}
+
+void TypeChecker::let_all_literal_typed(CallExpr* expr) {
+    auto& args_type = function_table_[expr->callee];
+    int iter = 1;
+    for (auto& arg: expr->args) {
+        let_all_literal_typed(arg.get(), args_type[iter]);
+        iter++;
+    }
 }

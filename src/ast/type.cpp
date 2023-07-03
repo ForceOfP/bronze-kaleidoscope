@@ -1,5 +1,8 @@
 #include "type.hpp"
 
+#include <cassert>
+#include <llvm-15/llvm/IR/Type.h>
+#include <llvm/IR/LLVMContext.h>
 #include <llvm/ADT/APInt.h>
 #include <llvm/ADT/APFloat.h>
 #include <llvm/IR/Constants.h>
@@ -9,13 +12,14 @@ using TypeSystem::Type;
 Type TypeSystem::find_type(std::string&& name) {
     if (name == "double") {
         return Type::Double;
-    } else if (name == "int32") {
+    } else if (name == "i32") {
         return Type::Int32;
     }
-    return Type::Error;
+    assert(false && "Unknown type name");
+    //return Type::Error;
 }
 
-llvm::Value* TypeSystem::get_type_init_value(Type type, llvm::LLVMContext& context) {
+llvm::Value* TypeSystem::get_type_init_llvm_value(Type type, llvm::LLVMContext& context) {
     switch (type) {
     case TypeSystem::Type::Double:
         return llvm::ConstantFP::get(context, llvm::APFloat(0.0));
@@ -50,4 +54,17 @@ std::string TypeSystem::get_type_str(Type type) {
         return "any";
     }
     return "";
+}
+
+llvm::Type* TypeSystem::get_llvm_type(Type type, llvm::LLVMContext& context) {
+    switch (type) {
+    case Type::Double:
+        return llvm::Type::getDoubleTy(context);
+    case Type::Int32:
+        return llvm::Type::getInt32Ty(context);
+    case Type::Void:
+        return llvm::Type::getVoidTy(context);
+    default:    
+        return nullptr;
+    }
 }

@@ -59,6 +59,8 @@ void driver(Stage stage) {
         generator = new JitCodeGenerator(llvm::errs(), setting);
     }
     //auto generator = CodeGenerator(llvm::errs(), stage != Stage::Target); 
+    TypeChecker checker;
+
     for (;;) {
         cout << "ready> ";
         cout.flush();
@@ -87,11 +89,10 @@ void driver(Stage stage) {
                 }
             }
             
-            TypeChecker checker;
-
             for (auto& ast: asts) {
                 if (!checker.check(*ast)) {
                     cout << "TypeChecker failed at " << *ast << endl;
+                    cout << checker.err_ << endl;
                 }
             }            
 
