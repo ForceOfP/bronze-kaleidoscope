@@ -15,6 +15,8 @@ enum class TokenType {
     Delimiter, //';'
     LeftParenthesis, // '('
     RightParenthesis, // ')'
+    LeftSquareBrackets, // '['
+    RightSquareBrackets, // ']'
     LeftCurlyBrackets, // '{'
     RightCurlyBrackets, // '}'
     Comma, // ','
@@ -96,6 +98,10 @@ public:
             os << "[Exec]"; break;
         case TokenType::Answer: 
             os << "[->]"; break;
+        case TokenType::LeftSquareBrackets: 
+            os << "[ '[' ]"; break;
+        case TokenType::RightSquareBrackets: 
+            os << "[ ']' ]"; break;
         default:
             break;
         }

@@ -18,6 +18,13 @@ public:
 
 using ExpressionPtr = std::unique_ptr<Expression>;
 
+struct ArrayExpr: public Expression {
+    std::vector<ExpressionPtr> elements;
+    std::string type;
+    //TypeSystem::TypeEnum type;
+    ArrayExpr(std::vector<ExpressionPtr> _elements, std::string _type): elements(std::move(_elements)), type(std::move(_type)) {}
+};
+
 struct Body {
     std::vector<ExpressionPtr> data;
     bool has_return_value;
@@ -30,8 +37,9 @@ struct Body {
 
 struct LiteralExpr: public Expression {
     double value;
-    TypeSystem::Type type;
-    explicit LiteralExpr(double d, TypeSystem::Type t): value(d), type(t) {}
+    std::string type;
+
+    explicit LiteralExpr(double d, std::string _type): value(d), type(std::move(_type)) {}
 };
 
 struct VariableExpr: public Expression {
@@ -76,20 +84,22 @@ struct ForExpr: public Expression {
 struct UnaryExpr: public Expression {
     std::string _operater;
     ExpressionPtr operand;
+    std::vector<ExpressionPtr> indexes;
 
-    UnaryExpr(std::string name, ExpressionPtr opnd):
-        _operater(std::move(name)), operand(std::move(opnd)) {}
+    UnaryExpr(std::string oper, ExpressionPtr opnd):
+        _operater(std::move(oper)), operand(std::move(opnd)) {}
 };
 
 struct VarDeclareExpr: public Expression {    
-    TypeSystem::Type type;
+    //TypeSystem::TypeEnum type;
+    std::string type;
     std::string name;
     ExpressionPtr value;
     bool is_const;
 
     explicit VarDeclareExpr(
-        TypeSystem::Type _type, std::string _name, ExpressionPtr expr, bool _is_const):
-        type(_type), name(std::move(_name)), value(std::move(expr)), is_const(_is_const) {}
+        std::string _type, std::string _name, ExpressionPtr expr, bool _is_const):
+        type(std::move(_type)), name(std::move(_name)), value(std::move(expr)), is_const(_is_const) {}
 };
 
 struct ReturnExpr: public Expression {
@@ -100,21 +110,21 @@ struct ReturnExpr: public Expression {
 
 struct ProtoType {
     std::string name;
-    std::vector<std::pair<std::string, TypeSystem::Type>> args;
-    TypeSystem::Type answer;
+    std::vector<std::pair<std::string, std::string>> args;
+    std::string answer;
     bool is_operator_;
     unsigned precedence_;
 
-    ProtoType(std::string _name, std::vector<std::pair<std::string, TypeSystem::Type>> _args,
+    explicit ProtoType(std::string _name, std::vector<std::pair<std::string, std::string>> _args = {},
                 bool is_oper = false, unsigned prec = 0,
-                TypeSystem::Type answer_t = TypeSystem::Type::Uninit):
+                std::string answer_t = "uninit"):
         name(std::move(_name)), 
         args(std::move(_args)), 
-        answer(answer_t), 
+        answer(std::move(answer_t)), 
         is_operator_(is_oper),
         precedence_(prec) {}
 
-    ProtoType(): name(""), args({}) {}
+    ProtoType(): name(""), args() {}
 
     friend std::ostream& operator<<(std::ostream& os, const ProtoType& t);
 

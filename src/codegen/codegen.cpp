@@ -118,9 +118,9 @@ CodeGenerator::CodeGenerator(llvm::raw_ostream& os, CodeGeneratorSetting setting
 }
 
 llvm::AllocaInst* CodeGenerator::create_entry_block_alloca(
-    llvm::Function* function, const std::string& var_name, TypeSystem::Type type) {
+    llvm::Function* function, const std::string& var_name, TypeSystem::TypeBase* type) {
     llvm::IRBuilder<> builder(&function->getEntryBlock(), function->getEntryBlock().begin());
-    auto llvm_type = TypeSystem::get_llvm_type(type, *context_);
+    auto llvm_type = type->llvm_type(*context_);
     return builder.CreateAlloca(llvm_type, nullptr, var_name);
 }
 
@@ -151,7 +151,7 @@ llvm::Value* CodeGenerator::codegen(std::unique_ptr<VarDeclareExpr> e) {
     symbol_table_.step();
 
     auto& var_name = e->name;
-    auto var_type = e->type;
+    auto var_type = TypeSystem::find_type_by_name(std::move(e->type));
     auto init = std::move(e->value);
 
     llvm::Value* init_value;
@@ -161,7 +161,7 @@ llvm::Value* CodeGenerator::codegen(std::unique_ptr<VarDeclareExpr> e) {
             return nullptr;
         }
     } else { // If not specified, use 0.0.
-        init_value = TypeSystem::get_type_init_llvm_value(var_type, *context_);
+        init_value = var_type->llvm_init_name(*context_);
     }
 
     if (e->is_const) {
@@ -170,7 +170,7 @@ llvm::Value* CodeGenerator::codegen(std::unique_ptr<VarDeclareExpr> e) {
         }
         symbol_table_.add_constant(var_name, init_value);
     } else {
-        llvm::AllocaInst* alloca = create_entry_block_alloca(function, var_name, e->type);
+        llvm::AllocaInst* alloca = create_entry_block_alloca(function, var_name, var_type.get());
         builder_->CreateStore(init_value, alloca);
         
         symbol_table_.add_variant(var_name, alloca);
@@ -185,13 +185,15 @@ llvm::Value* CodeGenerator::codegen(std::unique_ptr<UnaryExpr> e) {
         return nullptr;
     }
 
-    llvm::Function* f = get_function(e->_operater);
-    if (!f) {
-        err_ = "Unknown unary operator";
-        return nullptr;
+    if (!e->_operater.empty()) {
+        llvm::Function* f = get_function(e->_operater);
+        if (!f) {
+            err_ = "Unknown unary operator";
+            return nullptr;
+        }
+        return builder_->CreateCall(f, opnd_value, "unop");
     }
-
-    return builder_->CreateCall(f, opnd_value, "unop");
+    return nullptr;
 }
 
 // Output for-loop as:
@@ -211,7 +213,8 @@ llvm::Value* CodeGenerator::codegen(std::unique_ptr<UnaryExpr> e) {
 // outloop:
 llvm::Value* CodeGenerator::codegen(std::unique_ptr<ForExpr> e) {
     llvm::Function* function = builder_->GetInsertBlock()->getParent();
-    llvm::AllocaInst* alloca = create_entry_block_alloca(function, e->var_name, TypeSystem::Type::Double);
+    auto double_type = std::make_unique<TypeSystem::DoubleType>();
+    llvm::AllocaInst* alloca = create_entry_block_alloca(function, e->var_name, double_type.get());
 
     auto start_value = codegen(std::move(e->start));
     if (!start_value) {
@@ -429,18 +432,20 @@ llvm::Value* CodeGenerator::codegen(std::unique_ptr<VariableExpr> e) {
 }
 
 llvm::Value* CodeGenerator::codegen(std::unique_ptr<LiteralExpr> e) {
-    switch (e->type) {
-    case TypeSystem::Type::Double:
+    auto tmp = e->type;
+    auto literal_type = TypeSystem::find_type_by_name(std::move(tmp));
+    return literal_type->get_llvm_value(*context_, e->value);
+/*     switch (e->type) {
+    case TypeSystem::TypeEnum::Double:
         return llvm::ConstantFP::get(*context_, llvm::APFloat(e->value));
-    case TypeSystem::Type::Int32:
+    case TypeSystem::TypeEnum::Int32:
         return llvm::ConstantInt::get(*context_, llvm::APInt(32, static_cast<int>(e->value)));
-    case TypeSystem::Type::Void:
+    case TypeSystem::TypeEnum::Void:
         return nullptr;
     default:
         err_ = "cannot infer type of literal " + std::to_string(e->value);
         return nullptr;
-    }
-    // return llvm::ConstantFP::get(*context_, llvm::APFloat(e->value));
+    } */
 }
 
 llvm::Value* CodeGenerator::codegen(std::unique_ptr<Expression> e) {
@@ -523,9 +528,11 @@ llvm::Function* CodeGenerator::codegen(ProtoTypePtr p) {
 
     std::vector<llvm::Type*> arg_types;
     for (auto& arg: p->args) {
-        arg_types.push_back(TypeSystem::get_llvm_type(arg.second, *context_));
+        auto arg_type = TypeSystem::find_type_by_name(std::move(arg.second));
+        arg_types.push_back(arg_type->llvm_type(*context_));
     }
-    auto result_type = TypeSystem::get_llvm_type(p->answer, *context_);
+    auto answer_type = TypeSystem::find_type_by_name(std::move(p->answer));
+    llvm::Type* result_type = answer_type->llvm_type(*context_);
     llvm::FunctionType* function_type = llvm::FunctionType::get(result_type, arg_types, false);
     llvm::Function* function = llvm::Function::Create(
         function_type, 
@@ -546,7 +553,7 @@ llvm::Function* CodeGenerator::codegen(FunctionNode& f) {
     // Transfer ownership of the prototype to the FunctionProtos map
 
     auto name = f.prototype->name;
-    function_protos_[name] = *f.prototype;
+    function_protos_[name] = std::move(*f.prototype);
     auto function = get_function(name);
 
     if (!function) {
@@ -570,7 +577,7 @@ llvm::Function* CodeGenerator::codegen(FunctionNode& f) {
     }
 
     return_block = llvm::BasicBlock::Create(*context_, "return");
-    ret_alloca = create_entry_block_alloca(function, "retAlloca", f.prototype->answer);
+    ret_alloca = create_entry_block_alloca(function, "retAlloca", function->getReturnType());
     auto& return_inserting_blocks = function->getBasicBlockList();
     return_inserting_blocks.insert(function->end(), return_block); 
 
@@ -642,5 +649,9 @@ llvm::Function* CodeGenerator::get_function(std::string& name) {
     }
 
     output_stream_ << "not find function!\n";
+    return nullptr;
+}
+
+llvm::Value* codegen(std::unique_ptr<ArrayExpr> e) {
     return nullptr;
 }

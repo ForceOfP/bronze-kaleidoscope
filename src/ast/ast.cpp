@@ -45,6 +45,11 @@ std::ostream& operator<<(std::ostream& os, const Body& body) {
     return os;
 }
 
+std::ostream& operator<<(std::ostream& os, const ArrayExpr& arr) {
+    os << "[Array]";
+    return os;
+}
+
 std::ostream& operator<<(std::ostream& os, const ExpressionPtr& e) {
     os << "\t[Body]: " << '\n';
     Expression* raw = e.get();
@@ -90,6 +95,11 @@ std::ostream& operator<<(std::ostream& os, const ExpressionPtr& e) {
     auto r = dynamic_cast<ReturnExpr*>(raw);
     if (r) {
         os << "\t\t[Return]\n";
+    }
+
+    auto arr = dynamic_cast<ArrayExpr*>(raw);
+    if (arr) {
+        os << "\t\t[Array]\n";
     }
 
     return os;

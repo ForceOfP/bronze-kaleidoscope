@@ -40,6 +40,7 @@ public:
     ExpressionPtr parse_identifier_expr();
     ExpressionPtr parse_literal_expr();
     ExpressionPtr parse_parenthesis_expr();
+    ExpressionPtr parse_square_array_expr();
 private:
     TokenType current_token_type() { return token_iter_->type_; }
     void next_token() { token_iter_++; }

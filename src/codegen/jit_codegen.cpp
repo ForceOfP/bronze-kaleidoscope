@@ -46,7 +46,7 @@ void JitCodeGenerator::codegen(std::vector<ASTNodePtr>&& ast_tree) {
             [&](FunctionNode& f) {
                 bool is_top = f.prototype->name == "__anon_expr";
                 if (is_top) {
-                    auto result_type = f.prototype->answer;
+                    auto result_type_name = f.prototype->answer;
                     if (auto ir = CodeGenerator::codegen(f)) {
                         auto rt = jit_->get_main_jit_dylib().createResourceTracker();
                         auto tsm = llvm::orc::ThreadSafeModule(
@@ -58,19 +58,12 @@ void JitCodeGenerator::codegen(std::vector<ASTNodePtr>&& ast_tree) {
 
                         auto expr_symbol = exit_on_error_(jit_->lookup("__anon_expr"));
                         auto address = expr_symbol.getAddress();
-                        switch (result_type) {
-                        case TypeSystem::Type::Int32: {
+                        if (result_type_name == "i32") {
                             auto functor_int = llvm::jitTargetAddressToPointer<int (*)()>(address);
                             output_stream_ << std::to_string(functor_int()) << '\n';
-                            break;
-                        }
-                        case TypeSystem::Type::Double: {
+                        } else if (result_type_name == "double") {
                             auto functor_double = llvm::jitTargetAddressToPointer<double (*)()>(address);
                             output_stream_ << std::to_string(functor_double()) << '\n';
-                            break;
-                        }
-                        default:
-                            break;
                         }
 
                         exit_on_error_(rt->remove());

@@ -1,7 +1,7 @@
 #include "parser.hpp"
 #include "ast/ast.hpp"
 #include "ast/token.hpp"
-#include "ast/type.hpp"
+// #include "ast/type.hpp"
 
 #include <algorithm>
 #include <cassert>
@@ -47,7 +47,8 @@ std::vector<ASTNodePtr> Parser::parse() {
 void Parser::parse_top_level_expression() {
     next_token(); // eat exec;
 
-    auto result_type = TypeSystem::Type::Uninit;
+    // std::unique_ptr<TypeSystem::TypeBase> result_type = std::make_unique<TypeSystem::UninitType>();
+    std::string result_type = "uninit";
 
     if (current_token_type() == TokenType::Colon) {
         next_token(); // eat ':'
@@ -55,7 +56,7 @@ void Parser::parse_top_level_expression() {
             err_ = "expect type-id before 'exec:'";
             return;
         }
-        result_type = TypeSystem::find_type(token_iter_->get_string());
+        result_type = token_iter_->get_string();
         next_token();
     }
 
@@ -71,8 +72,8 @@ void Parser::parse_top_level_expression() {
 
     // std::cout << "Parsed a top-level expr." << std::endl;
     
-    auto proto = std::make_unique<ProtoType>("__anon_expr", std::vector<TypeSystem::TypedInstanceName>());
-    proto->answer = result_type; 
+    auto proto = std::make_unique<ProtoType>("__anon_expr");
+    proto->answer = std::move(result_type); 
     ast_tree_.push_back(std::make_unique<ASTNode>(FunctionNode{std::move(proto), std::move(body)}));
 }
 
@@ -223,18 +224,17 @@ ProtoTypePtr Parser::parse_prototype() {
     }
 
     next_token();
-    std::vector<TypeSystem::TypedInstanceName> args{};
+    std::vector<std::pair<std::string, std::string>> args{};
     while (current_token_type() != TokenType::RightParenthesis) {
         if (current_token_type() == TokenType::Identifier) {
-            args.emplace_back((*token_iter_).get_string(), TypeSystem::Type::Error);
+            args.emplace_back((*token_iter_).get_string(), "error");
             next_token();
             if (current_token_type() != TokenType::Colon) {
                 err_ = "Expected ':' before identifier";
                 return nullptr;
             }
             next_token(); // eat ':'
-            auto type = TypeSystem::find_type((*token_iter_).get_string());
-            args.back().second = type;
+            args.back().second = token_iter_->get_string();
             next_token(); // eat type
 
             if (current_token_type() == TokenType::Comma) {
@@ -256,14 +256,14 @@ ProtoTypePtr Parser::parse_prototype() {
     }
     next_token(); // eat ')'
 
-    auto reture_type = TypeSystem::Type::Void;
+    std::string return_type = "void";
     if (current_token_type() == TokenType::Answer) {
         next_token(); // eat '->'
         if (current_token_type() != TokenType::Identifier) {
             err_ = "Expected type before '->'";
             return nullptr;
         }
-        reture_type = TypeSystem::find_type((*token_iter_).get_string());
+        return_type = token_iter_->get_string();
         next_token(); // eat type
     }
 
@@ -272,7 +272,7 @@ ProtoTypePtr Parser::parse_prototype() {
         return nullptr;
     }
 
-    return std::make_unique<ProtoType>(name, args, kind != 0, binary_precedence, reture_type);
+    return std::make_unique<ProtoType>(name, std::move(args), kind != 0, binary_precedence, std::move(return_type));
 }
 
 /// binoprhs::= [operator primary]*
@@ -330,6 +330,8 @@ ExpressionPtr Parser::parse_primary() {
         return parse_var_declare_expr();
     case TokenType::Return:
         return parse_return_expr();
+    case TokenType::LeftSquareBrackets:
+        return parse_square_array_expr();
     default:
         err_ = "unknown token when expecting an expression";
         return nullptr;
@@ -359,7 +361,7 @@ ExpressionPtr Parser::parse_var_declare_expr() {
         err_ = "expected type after colon";
         return nullptr;
     }
-    auto type =  TypeSystem::find_type(token_iter_->get_string());
+    std::string type = token_iter_->get_string();
     next_token(); // eat type
 
     ExpressionPtr init = nullptr;
@@ -372,7 +374,7 @@ ExpressionPtr Parser::parse_var_declare_expr() {
 
     // names.emplace_back(name, std::move(init));
 
-    return std::make_unique<VarDeclareExpr>(type, name, std::move(init), is_const);
+    return std::make_unique<VarDeclareExpr>(std::move(type), name, std::move(init), is_const);
 }
 
 /// forexpr ::= 'for' '(' identifier '=' expr ',' expr (',' expr)? ')' { body }
@@ -534,7 +536,28 @@ ExpressionPtr Parser::parse_unary() {
         || current_token_type() == TokenType::If
         || current_token_type() == TokenType::Var
         || current_token_type() == TokenType::Return) {
-        return parse_primary();
+        // return parse_primary();
+        auto opnd = parse_primary();
+        if (current_token_type() == TokenType::LeftSquareBrackets) {
+            auto ans = std::make_unique<UnaryExpr>("", std::move(opnd));
+            while (current_token_type() == TokenType::LeftSquareBrackets) {
+                next_token(); // eat '['
+                auto index = parse_unary();
+                if (!index) {
+                    err_ = "need value in []";
+                    return nullptr;
+                }
+                ans->indexes.push_back(std::move(index));
+                if (current_token_type() == TokenType::RightSquareBrackets) {
+                    next_token(); // eat ']'
+                } else {
+                    err_ = "expect ']' before '['";
+                    return nullptr;
+                }
+            }
+            return ans;
+        }
+        return opnd;
     }
 
     if (current_token_type() == TokenType::Operator) {
@@ -549,49 +572,54 @@ ExpressionPtr Parser::parse_unary() {
     return nullptr;
 }
 
-/// identifierexpr ::= identifier ['(' expression* ')']+
+/// identifierexpr ::= identifier '(' expression* ')'
+///                ::= identifier
 /// expression in parenthesis are splited by ','
 ExpressionPtr Parser::parse_identifier_expr() {
     std::string name = (*token_iter_).get_string();
     next_token(); // eat name
 
     // variable
-    if (current_token_type() != TokenType::LeftParenthesis) {
+    if (current_token_type() != TokenType::LeftParenthesis
+        && current_token_type() != TokenType::LeftSquareBrackets) {
         return std::make_unique<VariableExpr>(name); 
     }
 
-    // call
-    next_token(); // eat '('
-    std::vector<ExpressionPtr> args{};
-    if (current_token_type() != TokenType::RightParenthesis) {
-        while (true) {
-            if (auto arg = parse_expression()) {
-                args.push_back(std::move(arg));
-            } else {
-                return nullptr;
-            }
+    if (current_token_type() == TokenType::LeftParenthesis) {
+        // call
+        next_token(); // eat '('
+        std::vector<ExpressionPtr> args{};
+        if (current_token_type() != TokenType::RightParenthesis) {
+            while (true) {
+                if (auto arg = parse_expression()) {
+                    args.push_back(std::move(arg));
+                } else {
+                    return nullptr;
+                }
 
-            if (current_token_type() == TokenType::RightParenthesis) {
-                break;
-            }
+                if (current_token_type() == TokenType::RightParenthesis) {
+                    break;
+                }
 
-            if (current_token_type() != TokenType::Comma) {
-                err_ = "Expected ')' or ',' in argument list";
-                return nullptr;
+                if (current_token_type() != TokenType::Comma) {
+                    err_ = "Expected ')' or ',' in argument list";
+                    return nullptr;
+                }
+                next_token();
             }
-            next_token();
         }
-    }
-    next_token(); // eat ')'
+        next_token(); // eat ')'
 
-    return std::make_unique<CallExpr>(name, std::move(args));
+        return std::make_unique<CallExpr>(name, std::move(args));
+    }
+    return nullptr;
 }
 
 /// literalexpr ::= literal
 ExpressionPtr Parser::parse_literal_expr() {
     double val = (*token_iter_).get_literal();
     next_token();
-    auto type = TypeSystem::Type::Uninit;
+    std::string type = "uninit";
     if (current_token_type() == TokenType::Colon) {
         next_token(); // eat ':'
 
@@ -599,10 +627,10 @@ ExpressionPtr Parser::parse_literal_expr() {
             err_ = "expected type after colon";
             return nullptr;
         }
-        type =  TypeSystem::find_type(token_iter_->get_string());
+        type = token_iter_->get_string();
         next_token(); // eat type        
     }
-    auto res = std::make_unique<LiteralExpr>(val, type);
+    auto res = std::make_unique<LiteralExpr>(val, std::move(type));
     return res;
 }
 
@@ -620,6 +648,47 @@ ExpressionPtr Parser::parse_parenthesis_expr() {
     }
     next_token(); // eat ')'
     return res;
+}
+
+/// square_array_expr ::= '[' expression [',' expression]* ']' ':' type
+ExpressionPtr Parser::parse_square_array_expr() {
+    std::vector<ExpressionPtr> elements;
+    
+    next_token(); // eat '[';
+    auto element = parse_expression();
+    if (!element) {
+        return nullptr;
+    }
+    elements.push_back(std::move(element));
+
+    while (current_token_type() == TokenType::Comma) {
+        next_token(); // eat ','
+        auto _element = parse_expression();
+        if (!_element) {
+            return nullptr;
+        }
+        elements.push_back(std::move(_element));            
+    }
+
+    if (current_token_type() != TokenType::RightSquareBrackets) {
+        err_ = "expected ']' before '['";
+        return nullptr;
+    }
+    next_token(); // eat ']'
+
+    if (current_token_type() != TokenType::Colon) {
+        err_ = "expected ':' before ']'";
+        return nullptr;
+    }
+    next_token(); // eat ':'
+
+    if (current_token_type() != TokenType::Identifier) {
+        err_ = "expected type before ':'";
+        return nullptr;
+    }
+    std::string type = token_iter_->get_string();
+    next_token();
+    return std::make_unique<ArrayExpr>(std::move(elements), std::move(type));
 }
 
 int Parser::current_token_precedence() {
