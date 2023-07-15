@@ -711,6 +711,9 @@ void CodeGenerator::codegen(std::vector<ASTNodePtr>&& ast_tree) {
                         output_stream_ << err_ << '\n';
                     }                        
                 }
+            },
+            [&](StructNode& s) {
+                
             }
         );
     }

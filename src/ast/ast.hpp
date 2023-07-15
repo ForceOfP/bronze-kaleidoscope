@@ -181,14 +181,26 @@ struct FunctionNode {
     friend std::ostream& operator<<(std::ostream& os, const FunctionNode& t);
 };
 
+struct StructNode {
+    std::string name;
+    std::vector<std::pair<std::string, std::string>> elements;
+
+    explicit StructNode(std::string _name, std::vector<std::pair<std::string, std::string>> _elements)
+        : name(std::move(_name)), elements(std::move(_elements)) {}
+
+    friend std::ostream& operator<<(std::ostream& os, const StructNode& t);
+};
+
 struct ASTNode {
-    std::variant<ExternNode, FunctionNode> data;
+    std::variant<ExternNode, FunctionNode, StructNode> data;
     explicit ASTNode(ExternNode&& e): data(std::move(e)) {};
     explicit ASTNode(FunctionNode&& f): data(std::move(f)) {};
+    explicit ASTNode(StructNode&& s): data(std::move(s)) {};
 
-    template<typename ExternVisitor, typename FunctionVisitor>
-    auto match(ExternVisitor extern_visitor, FunctionVisitor function_visitor) {
-        return std::visit(overloaded{extern_visitor, function_visitor}, data);
+    template<typename ExternVisitor, typename FunctionVisitor, typename StructNode>
+    auto match(
+        ExternVisitor extern_visitor, FunctionVisitor function_visitor, StructNode struct_visitor) {
+        return std::visit(overloaded{extern_visitor, function_visitor, struct_visitor}, data);
     }
 
     friend std::ostream& operator<<(std::ostream& os, ASTNode& t);
@@ -197,4 +209,5 @@ struct ASTNode {
 using ASTNodePtr = std::unique_ptr<ASTNode>;
 using FunctionNodePtr = std::unique_ptr<FunctionNode>;
 using ExternNodePtr = std::unique_ptr<ExternNode>;
+using StructNodePtr = std::unique_ptr<StructNode>;
 using ProtoTypePtr = std::unique_ptr<ProtoType>;

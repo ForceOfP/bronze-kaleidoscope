@@ -24,6 +24,7 @@ public:
     void parse_top_level_expression();
     void parse_definition();
     void parse_extern();
+    void parse_struct_definition();
 
     Body parse_body();
     ExpressionPtr parse_expression();

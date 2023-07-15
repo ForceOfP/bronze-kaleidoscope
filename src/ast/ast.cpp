@@ -12,8 +12,19 @@ std::ostream& operator<<(std::ostream& os, ASTNode& t) {
         }, 
         [&](const FunctionNode& f){
             os << f;
+        },
+        [&](const StructNode& s) {
+            os << s;
         }
     );
+    return os;
+}
+
+std::ostream& operator<<(std::ostream& os, const StructNode& s) {
+    os << "[Struct]: \n";
+    for (auto& element: s.elements) {
+        os << "\t[Name]: " << element.first << " [Type]: " << element.second << '\n';
+    }
     return os;
 }
 

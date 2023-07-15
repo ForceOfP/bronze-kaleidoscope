@@ -110,7 +110,7 @@ void driver(Stage stage) {
 }
 
 int main(int argv, char** args) {
-    auto state = Stage::Codegen;
+    auto state = Stage::Parser;
 
     if (state == Stage::Target) {
         assert(argv == 3);

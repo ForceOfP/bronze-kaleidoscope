@@ -24,6 +24,9 @@ std::vector<ASTNodePtr> Parser::parse() {
         case TokenType::Extern:
             parse_extern();
             break;
+        case TokenType::Struct:
+            parse_struct_definition();
+            break;
         case TokenType::Delimiter:
             next_token();
             break;
@@ -44,9 +47,63 @@ std::vector<ASTNodePtr> Parser::parse() {
     return std::move(ast_tree_);
 }
 
+void Parser::parse_struct_definition() {
+    next_token(); // eat 'struct'
+
+    if (current_token_type() != TokenType::Identifier) {
+        err_ = "expect struct-name before struct";
+        return;
+    }
+    std::string name = token_iter_->get_string(); 
+    next_token(); // eat struct name
+
+    if (current_token_type() != TokenType::LeftCurlyBrackets) {
+        err_ = "expect { before 'struct'";
+        return;
+    }
+
+    next_token(); // eat '{'
+
+    std::vector<std::pair<std::string, std::string>> elements {};
+    while (current_token_type() != TokenType::RightCurlyBrackets) {
+        if (current_token_type() != TokenType::Identifier) {
+            err_ = "expect struct-element-name in struct content";
+            return;
+        }
+        std::string element_name = token_iter_->get_string(); 
+        next_token();
+        if (current_token_type() != TokenType::Colon) {
+            err_ = "expect struct ':' before struct-element-name";
+            return;
+        }
+        next_token(); // eat ':'
+        if (current_token_type() != TokenType::Identifier) {
+            err_ = "expect struct-element-type before ':'";
+            return;
+        }
+        std::string element_type = token_iter_->get_string(); 
+        next_token();        
+
+        if (current_token_type() != TokenType::Comma) {
+            err_ = "expect ',' at the last of struct line";
+            return;
+        }
+        next_token(); // eat ','        
+        elements.emplace_back(element_name, element_type);
+    }
+
+    if (current_token_type() != TokenType::RightCurlyBrackets) {
+        err_ = "expect } before struct-content";
+        return;
+    }
+
+    next_token(); // eat '}'
+    ast_tree_.push_back(std::make_unique<ASTNode>(StructNode{name, elements}));
+}
+
 /// top_level_expression ::= expression
 void Parser::parse_top_level_expression() {
-    next_token(); // eat exec;
+    next_token(); // eat 'exec'
 
     // std::unique_ptr<TypeSystem::TypeBase> result_type = std::make_unique<TypeSystem::UninitType>();
     std::string result_type = "uninit";

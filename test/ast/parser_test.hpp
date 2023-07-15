@@ -27,7 +27,8 @@ TEST(AST, parse) {
         "exec if (1) {2;} else {3;};",
         "exec for (i = 0, i < n, 1.0) {1;};",
         "exec for (i = 0, i < n) {1;};",
-        "def g(x: double) { return 1; }"
+        "def g(x: double) { return 1; }",
+        "struct A { b: int, c: double,}"
     };
 
     const std::vector<std::string> answer = {
@@ -38,6 +39,7 @@ TEST(AST, parse) {
         "[Function]: \n\t[Name]: __anon_expr\n\n\t[Body]: \n\t\t[Return]\n",
         "[Function]: \n\t[Name]: __anon_expr\n\n\t[Body]: \n\t\t[Return]\n",
         "[Function]: \n\t[Name]: g\n\t[Args]: x \n\t[Body]: \n\t\t[Return]\n",
+        "[Struct]: \n\t[Name]: b [Type]: int\n\t[Name]: c [Type]: double\n"
     };
 
     assert(target.size() == answer.size());

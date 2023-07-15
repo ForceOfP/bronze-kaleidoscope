@@ -94,6 +94,9 @@ bool TypeChecker::check(ASTNode& node) {
             auto result_type = f.prototype->answer;
             result_type_ = result_type;
             return check(f.body, result_type);
+        },
+        [&](StructNode& s) -> bool {
+            return true;
         }
     );
 }

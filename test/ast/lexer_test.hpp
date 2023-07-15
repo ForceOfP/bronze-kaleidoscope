@@ -29,6 +29,7 @@ TEST(AST, tokenize) {
         "def f(x) x + x ###afeabgnan####",
         "for in if else",
         "return 1",
+        "struct",
     };
     std::vector<std::string> answer = {
         "[Def] [Ident: f] [(] [Ident: x] [)] [Ident: x] [Oper: +] [Ident: x]",
@@ -39,7 +40,8 @@ TEST(AST, tokenize) {
         "[Extern]",
         "[Def] [Ident: f] [(] [Ident: x] [)] [Ident: x] [Oper: +] [Ident: x]",
         "[For] [In] [If] [Else]",
-        "[Return] [Literal: 1]"
+        "[Return] [Literal: 1]",
+        "[Struct]",
     };
 
     assert(target.size() == answer.size());
