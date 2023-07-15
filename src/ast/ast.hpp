@@ -14,6 +14,7 @@
 class Expression {
 public:
     virtual ~Expression() = default;
+    virtual std::string& expression_name() = 0;
 };
 
 using ExpressionPtr = std::unique_ptr<Expression>;
@@ -23,6 +24,7 @@ struct ArrayExpr: public Expression {
     std::string type;
     //TypeSystem::TypeEnum type;
     ArrayExpr(std::vector<ExpressionPtr> _elements, std::string _type): elements(std::move(_elements)), type(std::move(_type)) {}
+    std::string& expression_name() override {static std::string name = "[Array]"; return name;}
 };
 
 struct Body {
@@ -40,11 +42,18 @@ struct LiteralExpr: public Expression {
     std::string type;
 
     explicit LiteralExpr(double d, std::string _type): value(d), type(std::move(_type)) {}
+
+    std::string& expression_name() override {static std::string name = "[Literal]"; return name;}
 };
 
 struct VariableExpr: public Expression {
     std::string name;
+    std::vector<ExpressionPtr> offset_indexes;
     explicit VariableExpr(std::string str): name(std::move(str)) {}
+    VariableExpr(std::string str, std::vector<ExpressionPtr> offset_indexes):
+        name(std::move(str)), offset_indexes(std::move(offset_indexes)) {}
+
+    std::string& expression_name() override {static std::string name = "[Variable]"; return name;}
 };
 
 struct BinaryExpr: public Expression {
@@ -56,6 +65,8 @@ struct BinaryExpr: public Expression {
         std::unique_ptr<Expression> LHS,
         std::unique_ptr<Expression> RHS
     ): oper(std::move(op)), lhs(std::move(LHS)), rhs(std::move(RHS)) {}
+
+    std::string& expression_name() override {static std::string name = "[Binary]"; return name;}
 };
 
 struct CallExpr: public Expression {
@@ -64,6 +75,8 @@ struct CallExpr: public Expression {
 
     CallExpr(std::string _callee, std::vector<std::unique_ptr<Expression>> _args):
         callee(std::move(_callee)), args(std::move(_args)) {}
+
+    std::string& expression_name() override {static std::string name = "[Call]"; return name;}
 };
 
 struct IfExpr: public Expression {
@@ -71,6 +84,8 @@ struct IfExpr: public Expression {
     Body then, _else;
     IfExpr(ExpressionPtr c, Body t, Body e = {}): 
         condition(std::move(c)), then(std::move(t)), _else(std::move(e)) {}
+
+    std::string& expression_name() override {static std::string name = "[If]"; return name;}
 };
 
 struct ForExpr: public Expression {
@@ -79,15 +94,19 @@ struct ForExpr: public Expression {
     Body body;
     ForExpr(std::string name, ExpressionPtr s, ExpressionPtr e, ExpressionPtr _step, Body b):
         var_name(std::move(name)), start(std::move(s)), end(std::move(e)), step(std::move(_step)), body(std::move(b)) {}
+
+    std::string& expression_name() override {static std::string name = "[For]"; return name;}
 };
 
 struct UnaryExpr: public Expression {
     std::string _operater;
     ExpressionPtr operand;
-    std::vector<ExpressionPtr> indexes;
+    // std::vector<ExpressionPtr> offset_indexes;
 
     UnaryExpr(std::string oper, ExpressionPtr opnd):
         _operater(std::move(oper)), operand(std::move(opnd)) {}
+
+    std::string& expression_name() override {static std::string name = "[Unary]"; return name;}
 };
 
 struct VarDeclareExpr: public Expression {    
@@ -100,12 +119,16 @@ struct VarDeclareExpr: public Expression {
     explicit VarDeclareExpr(
         std::string _type, std::string _name, ExpressionPtr expr, bool _is_const):
         type(std::move(_type)), name(std::move(_name)), value(std::move(expr)), is_const(_is_const) {}
+
+    std::string& expression_name() override {static std::string name = "[VarDeclare]"; return name;}
 };
 
 struct ReturnExpr: public Expression {
     ExpressionPtr ret;
 
     explicit ReturnExpr(ExpressionPtr _ret): ret(std::move(_ret)) {}  
+
+    std::string& expression_name() override {static std::string name = "[Return]"; return name;}
 };
 
 struct ProtoType {

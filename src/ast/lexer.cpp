@@ -10,7 +10,7 @@ std::vector<Token> Lexer::tokenize(std::string target_) {
     //std::cout << target << std::endl;
     
     static const re2::RE2 token_regex(
-        "(?P<ident>[[:alpha:]]\\w*)|"
+        "(?P<ident>[[:alpha:]][\\w\\%]*)|"
         "(?P<number>\\d+\\.?\\d*)|"
         "(?P<delimiter>;)|"
         "(?P<colon>:)|"

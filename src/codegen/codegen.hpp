@@ -1,6 +1,5 @@
 #pragma once
 
-#include <llvm-15/llvm/IR/Value.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/Instructions.h>
@@ -31,7 +30,7 @@ public:
                            bool init = true);
     virtual ~CodeGenerator() = default;
 
-    // llvm::Value* codegen(std::unique_ptr<ArrayExpr> e);
+    llvm::Value* codegen(std::unique_ptr<ArrayExpr> e);
     llvm::Value* codegen(Body b);
     llvm::Value* codegen(std::unique_ptr<ReturnExpr> e);
     llvm::Value* codegen(std::unique_ptr<VarDeclareExpr> e);
@@ -56,10 +55,10 @@ public:
 
 protected:
     llvm::Function* get_function(std::string& name);
-    llvm::AllocaInst* create_entry_block_alloca(llvm::Function* function,
-                                                const std::string& var_name, TypeSystem::TypeBase* type);
-    llvm::AllocaInst* create_entry_block_alloca(llvm::Function* function,
-                                                const std::string& var_name, llvm::Type* type);
+    llvm::AllocaInst* create_entry_block_alloca(
+        llvm::Function* function, const std::string& var_name, TypeSystem::TypeBase* type);
+    llvm::AllocaInst* create_entry_block_alloca(
+        llvm::Function* function, const std::string& var_name, llvm::Type* type);
 protected:
     std::unique_ptr<llvm::LLVMContext> context_;
     std::unique_ptr<llvm::IRBuilder<>> builder_;

@@ -26,6 +26,7 @@ void codegen_helper(std::vector<std::string>& target, std::vector<std::string>& 
     for (int i = 0; i < target.size(); i++) {
         auto parser = Parser(Lexer::tokenize(target[i]), generator.binary_oper_precedence_);
         auto asts = parser.parse();
+
         for (auto& ast: asts) {
             if (!checker.check(*ast)) {
                 std::cout << "TypeChecker failed at line " << i << std::endl;
@@ -270,6 +271,70 @@ TEST(CODEGEN, addInt) {
     std::vector<std::string> answer = {
         "parsed definition.\n",
         "101\n",
+    };
+
+    assert(target.size() == answer.size());
+    codegen_helper(target, answer);
+}
+
+TEST(CODEGEN, arrayLoad) {
+    std::vector<std::string> target = {
+        "def f() -> double {var x:array\%double\%2 = [2, 3]:double; return x[1];}",
+        "exec f()",
+    };
+
+    std::vector<std::string> answer = {
+        "parsed definition.\n",
+        "3.000000\n",
+    };
+
+    assert(target.size() == answer.size());
+    codegen_helper(target, answer);
+}
+
+TEST(CODEGEN, arrayStore) {
+    std::vector<std::string> target = {
+        "def f() -> double {var x:array\%double\%2 = [2, 3]:double; x[1] = 4; return x[1] + x[0];}",
+        "exec f()",
+    };
+
+    std::vector<std::string> answer = {
+        "parsed definition.\n",
+        "6.000000\n",
+    };
+
+    assert(target.size() == answer.size());
+    codegen_helper(target, answer);
+}
+
+TEST(CODEGEN, arrayFibo) {
+    std::vector<std::string> target = {
+        "def f(n: double) -> double {var x:array\%double\%2 = [1, 1]:double; for (i = 1: double, i < n - 2:double) {var tmp:double = x[1];x[1] = x[0] + x[1];x[0] = tmp;}; return x[1];}",
+        "exec f(10)",
+        "exec f(9)",
+        "exec f(11)",
+    };
+
+    std::vector<std::string> answer = {
+        "parsed definition.\n",
+        "55.000000\n",
+        "34.000000\n",
+        "89.000000\n",
+    };
+
+    assert(target.size() == answer.size());
+    codegen_helper(target, answer);
+}
+
+TEST(CODEGEN, arrayNested) {
+    std::vector<std::string> target = {
+        "def f() -> double {var x:array\%array\%double\%2\%2 = [[2, 2]:double, [3, 3]:double]:double; x[0][1] = 4; return x[0][1] + x[1][0];}",
+        "exec f()",
+    };
+
+    std::vector<std::string> answer = {
+        "parsed definition.\n",
+        "7.000000\n",
     };
 
     assert(target.size() == answer.size());

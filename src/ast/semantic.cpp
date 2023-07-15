@@ -150,6 +150,11 @@ bool TypeChecker::check(const Body& body, std::string& type) {
             valid = check(r, result_type_);
         }
 
+        auto arr = dynamic_cast<ArrayExpr*>(expr);
+        if (arr) {
+            valid = check(arr, my_any);
+        }
+
         if (!valid) {
             //err_ += "no expression find.";
             return false;
@@ -202,6 +207,11 @@ bool TypeChecker::check(const Body& body, std::string& type) {
         auto r = dynamic_cast<ReturnExpr*>(expr);
         if (r) {
             valid = check(r, result_type_);
+        }
+
+        auto arr = dynamic_cast<ArrayExpr*>(expr);
+        if (arr) {
+            valid = check(arr, result_type_);
         }
 
         if (!valid) {
@@ -258,6 +268,11 @@ bool TypeChecker::check(Expression* expr, std::string& type) {
         return check(r, result_type_);
     }
 
+    auto arr = dynamic_cast<ArrayExpr*>(expr);
+    if (arr) {
+        return check(r, type);
+    }
+
     err_ += "no expression find;";
     return false;
 }
@@ -288,6 +303,13 @@ bool TypeChecker::check(LiteralExpr* expr, std::string& type) {
 
 bool TypeChecker::check(VariableExpr* expr, std::string& type) {
     auto _type = symbol_table_.find_symbol_type(expr->name);
+
+    if (!expr->offset_indexes.empty()) {
+        for (int i = 0; i < expr->offset_indexes.size(); i++) {
+            _type = TypeSystem::extract_nesting_type(_type).first;
+        }
+    }
+
     if (TypeSystem::is_same_type(_type, type)) {
         if (anonymous_binary_status_ == AgainstStatus::Checking) {
             if (anonymous_binary_type_str_ == "any") {
@@ -297,7 +319,7 @@ bool TypeChecker::check(VariableExpr* expr, std::string& type) {
         return true;
     } else {
         err_ += "variable type check error;";
-        err_ += "found " + symbol_table_.find_symbol_type(expr->name);
+        err_ += "target: " + expr->name + " found " + symbol_table_.find_symbol_type(expr->name);
         err_ += " expect " + type + ';';
 
         return false;
@@ -313,6 +335,14 @@ bool TypeChecker::check(BinaryExpr* expr, std::string& type) {
             return false;
         } else {
             type = symbol_table_.find_symbol_type(variable->name);
+            if (!variable->offset_indexes.empty()) {
+                for (auto& offset: variable->offset_indexes) {
+                    let_all_literal_typed(offset.get(), my_int32);
+                }
+                for (int i = 0; i < variable->offset_indexes.size(); i++) {
+                    type = TypeSystem::extract_nesting_type(type).first;
+                }
+            }
         }
 
         if (!expr->rhs) {
@@ -440,6 +470,15 @@ bool TypeChecker::check(ReturnExpr* expr, std::string& type) {
     return true;
 }
 
+bool TypeChecker::check(ArrayExpr* expr, std::string& type) {
+    for (auto& element: expr->elements) {
+        if (!check(element.get(), type)) {
+            return false;
+        }
+    }
+    return true;
+}
+
 bool TypeChecker::check_anonymous_expression(Expression* expr) {
     switch (anonymous_binary_status_) {
     case AgainstStatus::Init:
@@ -503,6 +542,24 @@ void TypeChecker::let_all_literal_typed(Expression* expr, std::string& type) {
     auto c = dynamic_cast<CallExpr*>(expr);
     if (c) {
         let_all_literal_typed(c);
+    }
+
+    auto arr = dynamic_cast<ArrayExpr*>(expr);
+    if (arr) {
+        auto [element_type, array_size] = TypeSystem::extract_nesting_type(type);
+        for (auto& element: arr->elements) {
+            let_all_literal_typed(element.get(), element_type);
+        }
+    }
+
+    auto v = dynamic_cast<VariableExpr*>(expr);
+    if (v) {
+        if (!v->offset_indexes.empty()) {
+            for (auto& offset: v->offset_indexes) {
+                let_all_literal_typed(offset.get(), my_int32);
+            }
+            
+        }
     }
 
     return;    

@@ -41,6 +41,7 @@ public:
     bool check(UnaryExpr* expr, std::string& type);
     bool check(VarDeclareExpr* expr, std::string& type);
     bool check(ReturnExpr* expr, std::string& type);
+    bool check(ArrayExpr* expr, std::string& type);
 
     // check against
     bool check_anonymous_expression(Expression* expr);
@@ -56,5 +57,7 @@ private:
     Semantic::NaiveSymbolTable symbol_table_;
     std::unordered_map<std::string, std::vector<std::string>> function_table_;
     std::string result_type_;
+
+    std::string my_int32 = "i32";
 };
 

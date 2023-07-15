@@ -1,10 +1,7 @@
 #include "codegen.hpp"
 
+#include <cstdint>
 #include <iostream>
-#include <llvm-15/llvm/ADT/APInt.h>
-#include <llvm-15/llvm/IR/Constant.h>
-#include <llvm-15/llvm/IR/Constants.h>
-#include <llvm-15/llvm/IR/Type.h>
 #include <llvm/ADT/Optional.h>
 #include <llvm/Support/CodeGen.h>
 #include <llvm/Support/FileSystem.h>
@@ -35,6 +32,7 @@
 #include <optional>
 #include <string>
 #include <system_error>
+#include <unistd.h>
 #include <utility>
 #include <vector>
 #include <cassert>
@@ -130,6 +128,27 @@ llvm::AllocaInst* CodeGenerator::create_entry_block_alloca(llvm::Function* funct
     return builder.CreateAlloca(llvm_type, nullptr, var_name);
 }
 
+llvm::Value* CodeGenerator::codegen(std::unique_ptr<ArrayExpr> e) {
+    std::vector<llvm::Constant*> values;
+    int cnt = 0;
+    for (auto& element: e->elements) {
+        auto element_value = codegen(std::move(element));
+        if (!element_value) {
+            err_ = "generate array value idx: " + std::to_string(cnt) + " error";
+            return nullptr;
+        }
+        values.push_back(static_cast<llvm::Constant*>(element_value));
+        cnt++;
+    }
+    auto array_type = TypeSystem::find_type_by_name(std::move(e->type));
+    auto ans = array_type->get_llvm_value(*context_, std::any(values));
+    if (!ans) {
+        err_ = "Generate ConstantArray error";
+        return nullptr;
+    }
+    return ans;
+}
+
 llvm::Value* CodeGenerator::codegen(std::unique_ptr<ReturnExpr> e) {
     llvm::Value* ret = codegen(std::move(e->ret));
     if (!err_.empty()) {
@@ -154,10 +173,10 @@ llvm::Value* CodeGenerator::codegen(std::unique_ptr<VarDeclareExpr> e) {
     auto var_type = TypeSystem::find_type_by_name(std::move(e->type));
     auto init = std::move(e->value);
 
-    llvm::Value* init_value;
+    llvm::Value* init_value = nullptr;
     if (init) {
         init_value = codegen(std::move(init));
-        if (!init_value) {
+        if (!err_.empty()) {
             return nullptr;
         }
     } else { // If not specified, use 0.0.
@@ -168,12 +187,37 @@ llvm::Value* CodeGenerator::codegen(std::unique_ptr<VarDeclareExpr> e) {
         if (!init_value) {
             output_stream_ << "error in store const\n";
         }
+        if (var_type->is_aggregate() || var_type->is_data_structure()) {
+            symbol_table_.add_constant(var_name, init_value, var_type->name());
+        }
         symbol_table_.add_constant(var_name, init_value);
     } else {
-        llvm::AllocaInst* alloca = create_entry_block_alloca(function, var_name, var_type.get());
-        builder_->CreateStore(init_value, alloca);
-        
-        symbol_table_.add_variant(var_name, alloca);
+        llvm::AllocaInst* alloca = nullptr;
+        if (var_type->is_data_structure()) {            
+            auto array_type = static_cast<TypeSystem::ArrayType*>(var_type.get());
+            alloca = create_entry_block_alloca(function, var_name, array_type);
+            
+            auto shadow_global_array = new llvm::GlobalVariable(
+                *module_, array_type->llvm_type(*context_), true,
+                llvm::Function::InternalLinkage,
+                static_cast<llvm::ConstantArray*>(init_value),
+                "shadow"
+            );
+
+            builder_->CreateMemCpy(
+                alloca, 
+                alloca->getAlign(), 
+                shadow_global_array,
+                shadow_global_array->getAlign(),
+                array_type->llvm_memory_size(*module_)
+            );
+
+            symbol_table_.add_variant(var_name, alloca, var_type->name());
+        } else {
+            alloca = create_entry_block_alloca(function, var_name, var_type.get());
+            builder_->CreateStore(init_value, alloca);
+            symbol_table_.add_variant(var_name, alloca);
+        }
     }
 
     return nullptr;
@@ -375,6 +419,9 @@ llvm::Value* CodeGenerator::codegen(std::unique_ptr<CallExpr> e) {
     return builder_->CreateCall(callee_func, args_values, "calltmp");
 }
 
+/*
+this function should synchronize changed with JitCodeGenerator::codegen(std::unique_ptr<BinaryExpr> e) 
+*/
 llvm::Value* CodeGenerator::codegen(std::unique_ptr<BinaryExpr> e) {
     // Special case '=' because we don't want to emit the LHS as an expression.
     if (e->oper == "=") {
@@ -389,10 +436,27 @@ llvm::Value* CodeGenerator::codegen(std::unique_ptr<BinaryExpr> e) {
             return nullptr;
         }
 
-        if (!symbol_table_.store(builder_.get(), lhse->name, rhs_value)) {
-            err_ = "SymbolTable store " + lhse->name + "failed.";
-            return nullptr;
+        if (!lhse->offset_indexes.empty()) {
+            std::vector<llvm::Value*> offset_values {llvm::ConstantInt::get(*context_, llvm::APInt(32, 0))};
+            for (auto& index: lhse->offset_indexes) {
+                if (auto offset_value = codegen(std::move(index))) {
+                    offset_values.push_back(offset_value);
+                } else {
+                    return nullptr;
+                }
+            }
+
+            if (!symbol_table_.store(builder_.get(), lhse->name, rhs_value, offset_values)) {
+                err_ = "SymbolTable store " + lhse->name + "failed.";
+                return nullptr;
+            }
+        } else {
+            if (!symbol_table_.store(builder_.get(), lhse->name, rhs_value)) {
+                err_ = "SymbolTable store " + lhse->name + "failed.";
+                return nullptr;
+            }            
         }
+
         return rhs_value; // support a = (b = c);
     }
     
@@ -422,8 +486,29 @@ llvm::Value* CodeGenerator::codegen(std::unique_ptr<BinaryExpr> e) {
     return f(builder_.get(), l, r);
 }
 
+// def f() -> double {var x:array%array%double%2%2 = [[2, 2]:double, [3, 3]:double]:double; x[0][1] = 4; return x[0][1] + x[1][0];}
+
 llvm::Value* CodeGenerator::codegen(std::unique_ptr<VariableExpr> e) {
     if (auto ret = symbol_table_.load(builder_.get(), e->name)) {
+        if (!e->offset_indexes.empty()) {
+            std::vector<llvm::Value*> offset_values {llvm::ConstantInt::get(*context_, llvm::APInt(32, 0))};
+            // std::vector<llvm::Value*> offset_values {};
+            
+            for (auto& offset: e->offset_indexes) {
+                auto offset_value = codegen(std::move(offset));
+                if (!offset_value) {
+                    return nullptr;
+                }
+                offset_values.push_back(offset_value);
+            }
+            auto target_type = static_cast<llvm::AllocaInst*>(ret)->getAllocatedType();
+            auto target_ptr = builder_->CreateInBoundsGEP(target_type, ret, offset_values, "offset");
+            // for (int i = 0; i < offset_values.size(); i++) {
+            for (int i = 0; i < offset_values.size() - 1; i++) {
+                target_type = static_cast<llvm::ArrayType*>(target_type)->getArrayElementType();
+            }
+            ret = builder_->CreateLoad(target_type, target_ptr, "offsetValue");
+        }
         return ret;
     }
 
@@ -435,17 +520,6 @@ llvm::Value* CodeGenerator::codegen(std::unique_ptr<LiteralExpr> e) {
     auto tmp = e->type;
     auto literal_type = TypeSystem::find_type_by_name(std::move(tmp));
     return literal_type->get_llvm_value(*context_, e->value);
-/*     switch (e->type) {
-    case TypeSystem::TypeEnum::Double:
-        return llvm::ConstantFP::get(*context_, llvm::APFloat(e->value));
-    case TypeSystem::TypeEnum::Int32:
-        return llvm::ConstantInt::get(*context_, llvm::APInt(32, static_cast<int>(e->value)));
-    case TypeSystem::TypeEnum::Void:
-        return nullptr;
-    default:
-        err_ = "cannot infer type of literal " + std::to_string(e->value);
-        return nullptr;
-    } */
 }
 
 llvm::Value* CodeGenerator::codegen(std::unique_ptr<Expression> e) {
@@ -502,6 +576,12 @@ llvm::Value* CodeGenerator::codegen(std::unique_ptr<Expression> e) {
     if (r) {
         std::unique_ptr<ReturnExpr> tmp(r);
         return codegen(std::move(tmp));  
+    }
+
+    auto arr = dynamic_cast<ArrayExpr*>(raw);
+    if (arr) {
+        std::unique_ptr<ArrayExpr> tmp(arr);
+        return codegen(std::move(tmp));          
     }
 
     return nullptr;
@@ -591,7 +671,7 @@ llvm::Function* CodeGenerator::codegen(FunctionNode& f) {
         llvm::verifyFunction(*function);
 
         if (setting_.function_pass_optimize) {
-            function_pass_manager_->run(*function);
+            // function_pass_manager_->run(*function);
         }
         
         symbol_table_.back();
@@ -652,6 +732,3 @@ llvm::Function* CodeGenerator::get_function(std::string& name) {
     return nullptr;
 }
 
-llvm::Value* codegen(std::unique_ptr<ArrayExpr> e) {
-    return nullptr;
-}

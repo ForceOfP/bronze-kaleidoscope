@@ -104,10 +104,27 @@ llvm::Value* JitCodeGenerator::codegen(std::unique_ptr<BinaryExpr> e) {
             return nullptr;
         }
 
-        if (!symbol_table_.store(builder_.get(), lhse->name, rhs_value)) {
-            err_ = "SymbolTable store " + lhse->name + " failed.";
-            return nullptr;
+        if (!lhse->offset_indexes.empty()) {
+            std::vector<llvm::Value*> offset_values {llvm::ConstantInt::get(*context_, llvm::APInt(32, 0))};
+            for (auto& index: lhse->offset_indexes) {
+                if (auto offset_value = CodeGenerator::codegen(std::move(index))) {
+                    offset_values.push_back(offset_value);
+                } else {
+                    return nullptr;
+                }
+            }
+
+            if (!symbol_table_.store(builder_.get(), lhse->name, rhs_value, offset_values)) {
+                err_ = "SymbolTable store " + lhse->name + "failed.";
+                return nullptr;
+            }
+        } else {
+            if (!symbol_table_.store(builder_.get(), lhse->name, rhs_value)) {
+                err_ = "SymbolTable store " + lhse->name + "failed.";
+                return nullptr;
+            }            
         }
+
         return rhs_value; // support a = (b = c);
     }
     

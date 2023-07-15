@@ -7,7 +7,7 @@
 #include <cassert>
 #include <cstdlib>
 #include <fstream>
-#include <llvm-15/llvm/Support/raw_ostream.h>
+#include <llvm/Support/raw_ostream.h>
 #include <llvm-c/Target.h>
 #include <llvm/Support/raw_ostream.h>
 #include <string>
@@ -91,7 +91,7 @@ void driver(Stage stage) {
             
             for (auto& ast: asts) {
                 if (!checker.check(*ast)) {
-                    cout << "TypeChecker failed at " << *ast << endl;
+                    cout << "TypeChecker failed at: \n" << *ast << endl;
                     cout << checker.err_ << endl;
                 }
             }            
