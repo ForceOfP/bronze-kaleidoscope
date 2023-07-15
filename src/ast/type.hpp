@@ -11,12 +11,13 @@
 #include <memory>
 #include <string>
 #include <utility>
+#include <vector>
 
 namespace TypeSystem {
 
 struct TypeBase {
     virtual std::string name() = 0;
-    virtual llvm::Value* llvm_init_name(llvm::LLVMContext& context) = 0;
+    virtual llvm::Value* llvm_init_value(llvm::LLVMContext& context) = 0;
     virtual llvm::Type* llvm_type(llvm::LLVMContext& context) = 0;
     virtual llvm::Value* get_llvm_value(llvm::LLVMContext& context, std::any value) = 0;
 
@@ -40,7 +41,17 @@ struct AggregateType: public TypeBase {
     bool is_primitive() final {return false;}
     bool is_aggregate() final {return true;}
     bool is_data_structure() final {return false;}
-    uint64_t llvm_memory_size(llvm::Module& _module) override {return 0;}
+
+    AggregateType(std::string name, std::vector<std::pair<std::string, std::string>>& _elements);
+    llvm::Value* llvm_init_value(llvm::LLVMContext& context) override;
+    llvm::Type* llvm_type(llvm::LLVMContext& context) override;
+    llvm::Value* get_llvm_value(llvm::LLVMContext& context, std::any value) override;    
+    uint64_t llvm_memory_size(llvm::Module& _module) override;
+    
+    std::string name() override {return name_;}
+private:
+    std::vector<std::pair<std::string, std::unique_ptr<TypeBase>>> name_with_types_{};
+    std::string name_;
 };
 
 struct DataStructureType: public TypeBase {
@@ -60,7 +71,7 @@ struct Int32Type: public PrimitiveType {
         static std::string name = "i32";
         return name;
     }
-    llvm::Value* llvm_init_name(llvm::LLVMContext& context) override;
+    llvm::Value* llvm_init_value(llvm::LLVMContext& context) override;
     llvm::Type* llvm_type(llvm::LLVMContext& context) override;
     llvm::Value* get_llvm_value(llvm::LLVMContext& context, std::any value) override;
 };
@@ -70,7 +81,7 @@ struct DoubleType: public PrimitiveType {
         static std::string name = "double";
         return name;
     }
-    llvm::Value* llvm_init_name(llvm::LLVMContext& context) override;
+    llvm::Value* llvm_init_value(llvm::LLVMContext& context) override;
     llvm::Type* llvm_type(llvm::LLVMContext& context) override;
     llvm::Value* get_llvm_value(llvm::LLVMContext& context, std::any value) override;
 };
@@ -80,7 +91,7 @@ struct VoidType: public PrimitiveType {
         static std::string name = "void";
         return name;
     }
-    llvm::Value* llvm_init_name(llvm::LLVMContext& context) override {return nullptr;}
+    llvm::Value* llvm_init_value(llvm::LLVMContext& context) override {return nullptr;}
     llvm::Type* llvm_type(llvm::LLVMContext& context) override;
     llvm::Value* get_llvm_value(llvm::LLVMContext& context, std::any value) override {return nullptr;}
     uint64_t llvm_memory_size(llvm::Module& _module) override;
@@ -92,7 +103,7 @@ struct ArrayType: public DataStructureType {
         std::string ans = name + element_type->name() + '%' + std::to_string(length);
         return ans;
     }
-    llvm::Value* llvm_init_name(llvm::LLVMContext& context) override;
+    llvm::Value* llvm_init_value(llvm::LLVMContext& context) override;
     llvm::Type* llvm_type(llvm::LLVMContext& context) override;
     llvm::Value* get_llvm_value(llvm::LLVMContext& context, std::any value) override;
     uint64_t llvm_memory_size(llvm::Module& _module) override;
@@ -108,7 +119,7 @@ struct AnyType: public LogicalType {
         static std::string name = "any";
         return name;
     };
-    llvm::Value* llvm_init_name(llvm::LLVMContext& context) override {assert(false && "any type have no init valye");}
+    llvm::Value* llvm_init_value(llvm::LLVMContext& context) override {assert(false && "any type have no init valye");}
     llvm::Type* llvm_type(llvm::LLVMContext& context) override {assert(false && "any type have no llvm type");}
     llvm::Value* get_llvm_value(llvm::LLVMContext& context, std::any value) override {assert(false && "any type have no concrete value");}      
     uint64_t llvm_memory_size(llvm::Module& _module) override {assert(false && "any type have no memory size");};
@@ -119,7 +130,7 @@ struct UninitType: public LogicalType {
         static std::string name = "uninit";
         return name;
     };
-    llvm::Value* llvm_init_name(llvm::LLVMContext& context) override {assert(false && "uninit type have no init valye");}
+    llvm::Value* llvm_init_value(llvm::LLVMContext& context) override {assert(false && "uninit type have no init valye");}
     llvm::Type* llvm_type(llvm::LLVMContext& context) override {assert(false && "uninit type have no llvm type");}
     llvm::Value* get_llvm_value(llvm::LLVMContext& context, std::any value) override {assert(false && "uninit type have no concrete value");}  
     uint64_t llvm_memory_size(llvm::Module& _module) override {assert(false && "any type have no memory size");};
@@ -130,7 +141,7 @@ struct ErrorType: public LogicalType {
         static std::string name = "error";
         return name;
     };
-    llvm::Value* llvm_init_name(llvm::LLVMContext& context) override {assert(false && "error type have no init valye");}
+    llvm::Value* llvm_init_value(llvm::LLVMContext& context) override {assert(false && "error type have no init valye");}
     llvm::Type* llvm_type(llvm::LLVMContext& context) override {assert(false && "error type have no llvm type");}
     llvm::Value* get_llvm_value(llvm::LLVMContext& context, std::any value) override {assert(false && "error type have no concrete value");}  
     uint64_t llvm_memory_size(llvm::Module& _module) override {assert(false && "any type have no memory size");};

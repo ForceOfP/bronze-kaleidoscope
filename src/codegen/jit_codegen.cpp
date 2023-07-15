@@ -87,7 +87,7 @@ void JitCodeGenerator::codegen(std::vector<ASTNodePtr>&& ast_tree) {
                 }
             },
             [&](StructNode& s) {
-                
+                struct_table_[s.name] = std::make_unique<TypeSystem::AggregateType>(s.name, s.elements);
             }
         );
     }

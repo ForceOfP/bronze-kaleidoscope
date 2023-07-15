@@ -34,6 +34,7 @@ enum class TokenType {
     Exec,
     Answer, // means ->, such as "def f() -> double {...}"  
     Struct,
+    Dot, // '.'
     Init
 };
 
@@ -105,6 +106,8 @@ public:
             os << "[ ']' ]"; break;
         case TokenType::Struct:
             os << "[Struct]"; break;
+        case TokenType::Dot:
+            os << "[.]"; break;
         default:
             break;
         }

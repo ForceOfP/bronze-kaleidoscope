@@ -180,7 +180,7 @@ llvm::Value* CodeGenerator::codegen(std::unique_ptr<VarDeclareExpr> e) {
             return nullptr;
         }
     } else { // If not specified, use 0.0.
-        init_value = var_type->llvm_init_name(*context_);
+        init_value = var_type->llvm_init_value(*context_);
     }
 
     if (e->is_const) {
@@ -713,7 +713,7 @@ void CodeGenerator::codegen(std::vector<ASTNodePtr>&& ast_tree) {
                 }
             },
             [&](StructNode& s) {
-                
+                struct_table_[s.name] = std::make_unique<TypeSystem::AggregateType>(s.name, s.elements);
             }
         );
     }
