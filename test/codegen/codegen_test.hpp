@@ -48,7 +48,7 @@ TEST(CODEGEN, single) {
     };
 
     std::vector<std::string> answer = {
-        "parsed definition.\n",
+        "parsed function definition.\n",
         "declare double @sin(double)\n",
         "5.000000\n"
     };
@@ -65,9 +65,9 @@ TEST(CODEGEN, optimize) {
     };
 
     std::vector<std::string> answer = {
-        "parsed definition.\n",
-        "parsed definition.\n",
-        "parsed definition.\n"
+        "parsed function definition.\n",
+        "parsed function definition.\n",
+        "parsed function definition.\n"
     };
 
     assert(target.size() == answer.size());
@@ -82,7 +82,7 @@ TEST(CODEGEN, jit) {
     };
 
     std::vector<std::string> answer = {
-        "parsed definition.\n",
+        "parsed function definition.\n",
         "11.000000\n",
         "5.000000\n"
     };
@@ -104,7 +104,7 @@ TEST(CODEGEN, ext) {
         "declare double @sin(double)\n",
         "declare double @cos(double)\n",
         // TODO(lbt): there are still some folding problem...
-        "parsed definition.\n",
+        "parsed function definition.\n",
         "1.000000\n",
         "1.000000\n"
     };
@@ -124,9 +124,9 @@ TEST(CODEGEN, ifelse1) {
     };
 
     std::vector<std::string> answer = {
-        "parsed definition.\n",
-        "parsed definition.\n",
-        "parsed definition.\n",
+        "parsed function definition.\n",
+        "parsed function definition.\n",
+        "parsed function definition.\n",
         "4.000000\n",
         "15.000000\n"
     };
@@ -146,9 +146,9 @@ TEST(CODEGEN, ifelse2) {
     };
 
     std::vector<std::string> answer = {
-        "parsed definition.\n",
-        "parsed definition.\n",
-        "parsed definition.\n",
+        "parsed function definition.\n",
+        "parsed function definition.\n",
+        "parsed function definition.\n",
         "4.000000\n",
         "15.000000\n"
     };
@@ -164,7 +164,7 @@ TEST(CODEGEN, loop) {
     };
 
     std::vector<std::string> answer = {
-        "parsed definition.\n",
+        "parsed function definition.\n",
         "5050.000000\n",
     };
 
@@ -194,21 +194,21 @@ TEST(CODEGEN, oper) {
     };
 
     std::vector<std::string> answer = {
-/*         "parsed definition.\n",
+/*         "parsed function definition.\n",
         "-5.000000\n", */
-        "parsed definition.\n",
+        "parsed function definition.\n",
         "0.000000\n",
         "1.000000\n",
-        "parsed definition.\n",
+        "parsed function definition.\n",
         "0.000000\n",
         "1.000000\n",
-        "parsed definition.\n",
+        "parsed function definition.\n",
         "0.000000\n",
         "1.000000\n",
-        "parsed definition.\n",
+        "parsed function definition.\n",
         "0.000000\n",
         "1.000000\n",
-        "parsed definition.\n",
+        "parsed function definition.\n",
         "0.000000\n",
         "1.000000\n",
     };
@@ -224,7 +224,7 @@ TEST(CODEGEN, variant) {
     };
 
     std::vector<std::string> answer = {
-        "parsed definition.\n",
+        "parsed function definition.\n",
         "55.000000\n",
     };
 
@@ -239,7 +239,7 @@ TEST(CODEGEN, invariant) {
     };
 
     std::vector<std::string> answer = {
-        "parsed definition.\n",
+        "parsed function definition.\n",
         "1000.000000\n",
     };
 
@@ -254,7 +254,7 @@ TEST(CODEGEN, loopInt) {
     };
 
     std::vector<std::string> answer = {
-        "parsed definition.\n",
+        "parsed function definition.\n",
         "5050\n",
     };
 
@@ -269,7 +269,7 @@ TEST(CODEGEN, addInt) {
     };
 
     std::vector<std::string> answer = {
-        "parsed definition.\n",
+        "parsed function definition.\n",
         "101\n",
     };
 
@@ -284,7 +284,7 @@ TEST(CODEGEN, arrayLoad) {
     };
 
     std::vector<std::string> answer = {
-        "parsed definition.\n",
+        "parsed function definition.\n",
         "3.000000\n",
     };
 
@@ -299,7 +299,7 @@ TEST(CODEGEN, arrayStore) {
     };
 
     std::vector<std::string> answer = {
-        "parsed definition.\n",
+        "parsed function definition.\n",
         "6.000000\n",
     };
 
@@ -316,7 +316,7 @@ TEST(CODEGEN, arrayFibo) {
     };
 
     std::vector<std::string> answer = {
-        "parsed definition.\n",
+        "parsed function definition.\n",
         "55.000000\n",
         "34.000000\n",
         "89.000000\n",
@@ -333,7 +333,7 @@ TEST(CODEGEN, arrayNested) {
     };
 
     std::vector<std::string> answer = {
-        "parsed definition.\n",
+        "parsed function definition.\n",
         "7.000000\n",
     };
 
@@ -341,5 +341,19 @@ TEST(CODEGEN, arrayNested) {
     codegen_helper(target, answer);
 }
 
-// struct Foo {a: double, b: double,};
-// def f() -> double {var x: Foo; x.a = 1.0; return x.a;}
+TEST(CODEGEN, structSimple) {
+    std::vector<std::string> target = {
+        "struct Foo {a: double, b: double,}",
+        "def f() -> double {var x: Foo; x.a = 1.0; return x.a;}",
+        "exec f()"
+    };
+
+    std::vector<std::string> answer = {
+        "parsed struct definition.\n",
+        "parsed function definition.\n",
+        "1.000000\n",
+    };
+
+    assert(target.size() == answer.size());
+    codegen_helper(target, answer);
+}

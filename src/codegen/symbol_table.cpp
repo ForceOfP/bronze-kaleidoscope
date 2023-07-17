@@ -79,7 +79,6 @@ bool SymbolTable::store(llvm::IRBuilder<>* builder, const std::string& name, llv
     for (auto iter = variant_scoped_blocks_.rbegin(); iter != variant_scoped_blocks_.rend(); iter++, c_iter++) {
         if (iter->count(name)) {
             auto [alloca, type] = (*iter)[name];
-            std::cout << "finding " << name << std::endl;
             auto front_end_type = TypeSystem::find_type_by_name(std::move(type), struct_table_);
             auto front_end_type_raw = front_end_type.get();
 

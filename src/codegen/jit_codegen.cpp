@@ -76,7 +76,7 @@ void JitCodeGenerator::codegen(std::vector<ASTNodePtr>&& ast_tree) {
                         if (setting_.print_ir) {
                             ir->print(output_stream_);
                         } else {
-                            output_stream_ << "parsed definition.\n";
+                            output_stream_ << "parsed function definition.\n";
                         }
                         exit_on_error_(jit_->add_module(
                             llvm::orc::ThreadSafeModule(std::move(module_),std::move(context_))
@@ -89,6 +89,7 @@ void JitCodeGenerator::codegen(std::vector<ASTNodePtr>&& ast_tree) {
             },
             [&](StructNode& s) {
                 struct_table_.insert({s.name, TypeSystem::AggregateType(s.name, s.elements, struct_table_)});
+                output_stream_ << "parsed struct definition.\n";
                 // struct_table_[s.name] = std::make_unique<TypeSystem::AggregateType>(s.name, s.elements);
             }
         );
