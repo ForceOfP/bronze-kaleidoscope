@@ -107,6 +107,23 @@ AggregateType::AggregateType(
     }
 }
 
+AggregateType::AggregateType(std::string name, std::vector<std::pair<std::string, std::string>>& _elements, TypeManager& manager)
+    : name_(std::move(name)) {
+    int posi = 0;
+    for (auto& [_name, type_str]: elements_) {
+        auto type = manager.find_type_by_name(type_str);
+        index_with_types_.emplace_back(posi, std::move(type));
+        position_name_.insert({posi, _name});
+        name_position_.insert({_name, posi});
+        posi++;
+    }
+
+    for (auto& [index, type_ptr]: index_with_types_) {
+        name_type_hash_.insert({position_name_[index], type_ptr.get()});
+        index_type_hash_.insert({index, type_ptr.get()});
+    }
+}
+
 llvm::Value* AggregateType::llvm_init_value(llvm::LLVMContext& context) {
     std::vector<llvm::Constant*> values;
     values.reserve(index_with_types_.size());
@@ -150,24 +167,24 @@ TypeBase* AggregateType::element_type(std::string& element) {
     return name_type_hash_[element];
 }
 
-std::unique_ptr<TypeBase> find_type_by_name(std::string&& name, std::unordered_map<std::string, TypeSystem::AggregateType>& struct_table_) {
+std::shared_ptr<TypeBase> find_type_by_name(std::string&& name, std::unordered_map<std::string, TypeSystem::AggregateType>& struct_table_) {
     if (name == "double") {
-        return std::make_unique<DoubleType>();
+        return std::make_shared<DoubleType>();
     } else if (name == "i32") {
-        return std::make_unique<Int32Type>();
+        return std::make_shared<Int32Type>();
     } else if (name == "any") {
-        return std::make_unique<AnyType>();
+        return std::make_shared<AnyType>();
     } else if (name == "uninit") {
-        return std::make_unique<UninitType>();
+        return std::make_shared<UninitType>();
     } else if (name == "error") {
-        return std::make_unique<ErrorType>();
+        return std::make_shared<ErrorType>();
     } else if (name.starts_with("array")) {
         auto [element_name, array_size] = extract_nesting_type(name);
         auto type_ptr = find_type_by_name(std::move(element_name), struct_table_);
-        return std::make_unique<ArrayType>(array_size, std::move(type_ptr));
+        return std::make_shared<ArrayType>(array_size, std::move(type_ptr));
     } else if (struct_table_.count(name)) {
         auto& struct_type = struct_table_.at(name);
-        return std::make_unique<AggregateType>(struct_type.name_, struct_type.elements_, struct_table_);
+        return std::make_shared<AggregateType>(struct_type.name_, struct_type.elements_, struct_table_);
     }
 
     std::cout << "type name is: " << name << std::endl;
@@ -226,3 +243,29 @@ std::pair<std::string, int> extract_nesting_type(std::string& name) {
 }
 
 }  // namespace TypeSystem
+
+TypeManager::TypeManager() {
+    type_table_.insert({"i32", std::make_unique<TypeSystem::Int32Type>()});
+    type_table_.insert({"double", std::make_unique<TypeSystem::DoubleType>()});
+    type_table_.insert({"error", std::make_unique<TypeSystem::ErrorType>()});
+    type_table_.insert({"uninit", std::make_unique<TypeSystem::UninitType>()});
+    type_table_.insert({"any", std::make_unique<TypeSystem::AnyType>()});
+}
+
+std::shared_ptr<TypeSystem::TypeBase> TypeManager::find_type_by_name(std::string& name) {
+    if (type_table_.count(name)) {
+        return type_table_[name];
+    } else if (name.starts_with("array")) {
+        auto [element_name, array_size] = TypeSystem::extract_nesting_type(name);
+        auto type_ptr = find_type_by_name(element_name);
+        type_table_.insert({name, std::make_shared<TypeSystem::ArrayType>(array_size, std::move(type_ptr))});
+        return type_table_[name];        
+    } else {
+        std::cout << "type name is: " << name << std::endl;
+        assert(false && "Unknown type name");        
+    }
+}
+
+void TypeManager::add_type(std::string& name, std::vector<std::pair<std::string, std::string>>& _elements){
+    type_table_.insert({name, std::make_shared<TypeSystem::AggregateType>(name, _elements, *this)});
+}

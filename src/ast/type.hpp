@@ -14,9 +14,11 @@
 #include <utility>
 #include <vector>
 
+class TypeManager;
+
 namespace TypeSystem {
 
-struct TypeBase {
+struct TypeBase: public std::enable_shared_from_this<TypeBase> {
     virtual std::string name() = 0;
     virtual llvm::Value* llvm_init_value(llvm::LLVMContext& context) = 0;
     virtual llvm::Type* llvm_type(llvm::LLVMContext& context) = 0;
@@ -47,6 +49,9 @@ struct AggregateType: public TypeBase {
         std::string name, 
         std::vector<std::pair<std::string, std::string>>& _elements,
         std::unordered_map<std::string, TypeSystem::AggregateType>& struct_table);
+    
+    AggregateType(std::string name, std::vector<std::pair<std::string, std::string>>& _elements, TypeManager& manager);
+
     llvm::Value* llvm_init_value(llvm::LLVMContext& context) override;
     llvm::Type* llvm_type(llvm::LLVMContext& context) override;
     llvm::Value* get_llvm_value(llvm::LLVMContext& context, std::any value) override;    
@@ -60,7 +65,7 @@ struct AggregateType: public TypeBase {
     std::string name_;
     std::vector<std::pair<std::string, std::string>> elements_;
 private:
-    std::vector<std::pair<unsigned int, std::unique_ptr<TypeBase>>> index_with_types_{};
+    std::vector<std::pair<unsigned int, std::shared_ptr<TypeBase>>> index_with_types_{};
     std::unordered_map<unsigned int, std::string> position_name_{};
     std::unordered_map<std::string, unsigned int> name_position_{};
     std::unordered_map<std::string, TypeBase*> name_type_hash_{};
@@ -122,9 +127,9 @@ struct ArrayType: public DataStructureType {
     llvm::Value* get_llvm_value(llvm::LLVMContext& context, std::any value) override;
     uint64_t llvm_memory_size(llvm::Module& _module) override;
 
-    ArrayType(int len, std::unique_ptr<TypeBase> type): element_type(std::move(type)), length(len) {} 
+    ArrayType(int len, std::shared_ptr<TypeBase> type): element_type(std::move(type)), length(len) {} 
 
-    std::unique_ptr<TypeBase> element_type;
+    std::shared_ptr<TypeBase> element_type;
     int length = 0;
 };
 
@@ -161,7 +166,7 @@ struct ErrorType: public LogicalType {
     uint64_t llvm_memory_size(llvm::Module& _module) override {assert(false && "any type have no memory size");};
 }; 
 
-std::unique_ptr<TypeBase> find_type_by_name(std::string&& name, std::unordered_map<std::string, TypeSystem::AggregateType>& struct_table_);
+std::shared_ptr<TypeBase> find_type_by_name(std::string&& name, std::unordered_map<std::string, TypeSystem::AggregateType>& struct_table_);
 bool is_same_type(TypeBase* a, TypeBase* b);
 bool is_same_type(std::string& str, TypeBase* t);
 bool is_same_type(std::string& str, std::string& name);
@@ -170,5 +175,14 @@ std::pair<std::string, int> extract_nesting_type(std::string& name);
  
 }  // namespace TypeSystem
 
-using TypePtr = std::unique_ptr<TypeSystem::TypeBase>;
+using TypePtr = std::shared_ptr<TypeSystem::TypeBase>;
 using TypedInstanceName = std::pair<std::string, TypePtr>;
+
+class TypeManager {
+public:
+    TypeManager();
+    std::shared_ptr<TypeSystem::TypeBase> find_type_by_name(std::string& name);
+    void add_type(std::string& name, std::vector<std::pair<std::string, std::string>>& _elements);
+private:
+    std::unordered_map<std::string, std::shared_ptr<TypeSystem::TypeBase>> type_table_;
+};

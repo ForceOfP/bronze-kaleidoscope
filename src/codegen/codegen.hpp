@@ -53,7 +53,7 @@ public:
     std::map<std::string, int> binary_oper_precedence_ = {
         {"=", 2}, {"<", 10}, {"+", 20}, {"-", 20}, {"*", 40}};
     std::unordered_map<std::string, TypeSystem::AggregateType> struct_table_;
-
+    TypeManager type_manager_;
 protected:
     llvm::Function* get_function(std::string& name);
     llvm::AllocaInst* create_entry_block_alloca(

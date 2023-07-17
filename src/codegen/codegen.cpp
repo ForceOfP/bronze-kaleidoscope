@@ -772,7 +772,7 @@ void CodeGenerator::codegen(std::vector<ASTNodePtr>&& ast_tree) {
                 }
             },
             [&](StructNode& s) {
-                //struct_table_[s.name] = std::make_unique<TypeSystem::AggregateType>(s.name, s.elements);
+                type_manager_.add_type(s.name, s.elements);
                 struct_table_.insert({s.name, TypeSystem::AggregateType(s.name, s.elements, struct_table_)});
                 output_stream_ << "parsed struct definition.\n";
             }
