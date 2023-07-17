@@ -275,7 +275,7 @@ bool TypeChecker::check(Expression* expr, std::string& type) {
 
     auto arr = dynamic_cast<ArrayExpr*>(expr);
     if (arr) {
-        return check(r, type);
+        return check(arr, type);
     }
 
     err_ += "no expression find;";

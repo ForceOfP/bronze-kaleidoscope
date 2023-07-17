@@ -111,7 +111,7 @@ CodeGenerator::CodeGenerator(llvm::raw_ostream& os, CodeGeneratorSetting setting
             function_pass_manager_->add(llvm::createPromoteMemoryToRegisterPass());
             function_pass_manager_->add(llvm::createInstructionCombiningPass());
             function_pass_manager_->add(llvm::createReassociatePass());
-            function_pass_manager_->add(llvm::createGVNPass());
+            // function_pass_manager_->add(llvm::createGVNPass());
             function_pass_manager_->add(llvm::createCFGSimplificationPass());
         
             function_pass_manager_->doInitialization();
@@ -207,12 +207,15 @@ llvm::Value* CodeGenerator::codegen(std::unique_ptr<VarDeclareExpr> e) {
                 static_cast<llvm::ConstantArray*>(init_value),
                 "shadow"
             );
+            // auto element_type = shadow_global_array->getType()->getArrayElementType();
+            // llvm::Align align = module_->getDataLayout().getPrefTypeAlign(element_type);
 
             builder_->CreateMemCpy(
                 alloca, 
                 alloca->getAlign(), 
                 shadow_global_array,
-                shadow_global_array->getAlign(),
+                //shadow_global_array->getAlign(),
+                alloca->getAlign(),
                 array_type->llvm_memory_size(*module_)
             );
 
@@ -553,6 +556,7 @@ llvm::Value* CodeGenerator::codegen(std::unique_ptr<VariableExpr> e) {
                         }
                         offset_values.push_back(offset_value);
                         target_ptr = builder_->CreateInBoundsGEP(target_llvm_type, ret, offset_values, "offset");
+                        ret = target_ptr;
                         target_llvm_type = static_cast<llvm::ArrayType*>(target_llvm_type)->getArrayElementType();
                         target_front_end_type_str = TypeSystem::extract_nesting_type(target_front_end_type_str).first;
                     } else {
@@ -564,7 +568,9 @@ llvm::Value* CodeGenerator::codegen(std::unique_ptr<VariableExpr> e) {
 
                         offset_values.push_back(llvm::ConstantInt::get(*context_, llvm::APInt(32, index)));
                         target_ptr = builder_->CreateInBoundsGEP(target_llvm_type, ret, offset_values, "offset");
+                        ret = target_ptr;
                         target_llvm_type = static_cast<llvm::StructType*>(target_llvm_type)->getStructElementType(index);
+                        target_front_end_type_str = target_front_end_type_raw->element_type(taked_element_name)->name();
                     }
                 }
                 ret = builder_->CreateLoad(target_llvm_type, target_ptr, "offsetValue");
@@ -732,7 +738,7 @@ llvm::Function* CodeGenerator::codegen(FunctionNode& f) {
         llvm::verifyFunction(*function);
 
         if (setting_.function_pass_optimize) {
-            // function_pass_manager_->run(*function);
+            function_pass_manager_->run(*function);
         }
         
         symbol_table_.back();

@@ -357,3 +357,60 @@ TEST(CODEGEN, structSimple) {
     assert(target.size() == answer.size());
     codegen_helper(target, answer);
 }
+
+TEST(CODEGEN, structWithDifferentTypes) {
+    std::vector<std::string> target = {
+        "struct Foo {a: i32, b: double,}",
+        "def f() -> i32 {var x: Foo; x.a = 1; return x.a;}",
+        "def g() -> double {var x: Foo; x.b = 2.0; return x.b;}",
+        "exec f()",
+        "exec g()"
+    };
+
+    std::vector<std::string> answer = {
+        "parsed struct definition.\n",
+        "parsed function definition.\n",
+        "parsed function definition.\n",
+        "1\n",
+        "2.000000\n",
+    };
+
+    assert(target.size() == answer.size());
+    codegen_helper(target, answer);
+}
+
+TEST(CODEGEN, structContainsArray) {
+    std::vector<std::string> target = {
+        "struct Foo {a: double, b: array\%double\%2,}",
+        "def f() -> double {var x: Foo; x.b = [1.0, 2.0]:double; return x.b[1];}",
+        "exec f()"
+    };
+
+    std::vector<std::string> answer = {
+        "parsed struct definition.\n",
+        "parsed function definition.\n",
+        "2.000000\n",
+    };
+
+    assert(target.size() == answer.size());
+    codegen_helper(target, answer);
+}
+
+TEST(CODEGEN, structNested) {
+    std::vector<std::string> target = {
+        "struct Foo {m: double, n: i32,}",
+        "struct Bar {a: double, b: array\%Foo\%2,}",
+        "def f() -> double {var x: Bar; x.b[1].m = 1.0; return x.b[1].m;}",
+        "exec f()"
+    };
+
+    std::vector<std::string> answer = {
+        "parsed struct definition.\n",
+        "parsed struct definition.\n",
+        "parsed function definition.\n",
+        "1.000000\n",
+    };
+
+    assert(target.size() == answer.size());
+    codegen_helper(target, answer);
+}

@@ -24,7 +24,7 @@ void JitCodeGenerator::initialize_llvm_elements() {
         function_pass_manager_->add(llvm::createPromoteMemoryToRegisterPass());
         function_pass_manager_->add(llvm::createInstructionCombiningPass());
         function_pass_manager_->add(llvm::createReassociatePass());
-        function_pass_manager_->add(llvm::createGVNPass());
+        // function_pass_manager_->add(llvm::createGVNPass());
         function_pass_manager_->add(llvm::createCFGSimplificationPass());
     
         function_pass_manager_->doInitialization();

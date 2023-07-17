@@ -2,6 +2,9 @@
 #include "ast/type.hpp"
 #include <cassert>
 #include <iostream>
+#include <llvm-15/llvm/IR/DerivedTypes.h>
+#include <llvm-15/llvm/IR/Instructions.h>
+#include <llvm-15/llvm/IR/Type.h>
 #include <llvm-15/llvm/IR/Value.h>
 #include <variant>
 
@@ -82,10 +85,12 @@ bool SymbolTable::store(llvm::IRBuilder<>* builder, const std::string& name, llv
             auto front_end_type = type_manager.find_type_by_name(type);
             auto front_end_type_raw = front_end_type.get();
 
-            llvm::Value* ptr = nullptr;
+            llvm::Value* result_ptr = nullptr;
+            llvm::AllocaInst* target_ptr = alloca;
+            llvm::Type* target_type = alloca->getAllocatedType();
+
             for (auto& addr: addrs) {
                 std::vector<llvm::Value*> offset_values {llvm::ConstantInt::get(builder->getContext(), llvm::APInt(32, 0))};
-
                 if (std::holds_alternative<llvm::Value*>(addr)) {
                     if (auto arr = static_cast<TypeSystem::ArrayType*>(front_end_type_raw)) {
                         front_end_type_raw = arr->element_type.get();
@@ -94,20 +99,24 @@ bool SymbolTable::store(llvm::IRBuilder<>* builder, const std::string& name, llv
                     }
                     auto& offset = std::get<llvm::Value*>(addr);
                     offset_values.push_back(offset);
-                    ptr = builder->CreateInBoundsGEP(alloca->getAllocatedType(), alloca, offset_values, "addr");
+                    result_ptr = builder->CreateInBoundsGEP(target_type, target_ptr, offset_values, "addr");
+                    target_type = front_end_type_raw->llvm_type(builder->getContext());
+                    target_ptr = static_cast<llvm::AllocaInst*>(result_ptr);
                 } else {
                     auto element_name = std::get<std::string>(addr);
                     if (auto aggr = static_cast<TypeSystem::AggregateType*>(front_end_type_raw)) {
                         front_end_type_raw = aggr->element_type(element_name);
                         auto element_index = aggr->element_position(element_name);
                         offset_values.push_back(llvm::ConstantInt::get(builder->getContext(), llvm::APInt(32, element_index)));
-                        ptr = builder->CreateInBoundsGEP(alloca->getAllocatedType(), alloca, offset_values, "addr");                    
+                        result_ptr = builder->CreateInBoundsGEP(target_type, target_ptr, offset_values, "addr");                    
+                        target_type = target_type->getStructElementType(element_index);
+                        target_ptr = static_cast<llvm::AllocaInst*>(result_ptr);
                     } else {
                         assert(false && "need array type in store");
                     }
                 }
             }
-            builder->CreateStore(target, ptr);
+            builder->CreateStore(target, result_ptr);
 
             return true;
         }

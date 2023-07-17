@@ -167,30 +167,6 @@ TypeBase* AggregateType::element_type(std::string& element) {
     return name_type_hash_[element];
 }
 
-/* std::shared_ptr<TypeBase> find_type_by_name(std::string&& name, std::unordered_map<std::string, TypeSystem::AggregateType>& struct_table_) {
-    if (name == "double") {
-        return std::make_shared<DoubleType>();
-    } else if (name == "i32") {
-        return std::make_shared<Int32Type>();
-    } else if (name == "any") {
-        return std::make_shared<AnyType>();
-    } else if (name == "uninit") {
-        return std::make_shared<UninitType>();
-    } else if (name == "error") {
-        return std::make_shared<ErrorType>();
-    } else if (name.starts_with("array")) {
-        auto [element_name, array_size] = extract_nesting_type(name);
-        auto type_ptr = find_type_by_name(std::move(element_name), struct_table_);
-        return std::make_shared<ArrayType>(array_size, std::move(type_ptr));
-    } else if (struct_table_.count(name)) {
-        auto& struct_type = struct_table_.at(name);
-        return std::make_shared<AggregateType>(struct_type.name_, struct_type.elements_, struct_table_);
-    }
-
-    std::cout << "type name is: " << name << std::endl;
-    assert(false && "Unknown type name");
-} */
-
 bool is_same_type(TypeBase* a, TypeBase* b) {
     if (!a) {
         assert(false && "lhs is empty");
