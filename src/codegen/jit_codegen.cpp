@@ -89,9 +89,7 @@ void JitCodeGenerator::codegen(std::vector<ASTNodePtr>&& ast_tree) {
             },
             [&](StructNode& s) {
                 type_manager_.add_type(s.name, s.elements);
-                struct_table_.insert({s.name, TypeSystem::AggregateType(s.name, s.elements, struct_table_)});
                 output_stream_ << "parsed struct definition.\n";
-                // struct_table_[s.name] = std::make_unique<TypeSystem::AggregateType>(s.name, s.elements);
             }
         );
     }
@@ -141,7 +139,7 @@ llvm::Value* JitCodeGenerator::codegen(std::unique_ptr<BinaryExpr> e) {
                         element_or_offsets.emplace_back(std::get<std::string>(addr));
                     }
                 }
-                if (!symbol_table_.store(builder_.get(), lhse->name, rhs_value, element_or_offsets, struct_table_)) {
+                if (!symbol_table_.store(builder_.get(), lhse->name, rhs_value, element_or_offsets, type_manager_)) {
                     err_ = "SymbolTable store " + lhse->name + "failed.";
                     return nullptr;
                 } 

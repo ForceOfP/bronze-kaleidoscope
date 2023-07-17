@@ -44,13 +44,8 @@ struct AggregateType: public TypeBase {
     bool is_primitive() final {return false;}
     bool is_aggregate() final {return true;}
     bool is_data_structure() final {return false;}
-
-    AggregateType(
-        std::string name, 
-        std::vector<std::pair<std::string, std::string>>& _elements,
-        std::unordered_map<std::string, TypeSystem::AggregateType>& struct_table);
     
-    AggregateType(std::string name, std::vector<std::pair<std::string, std::string>>& _elements, TypeManager& manager);
+    AggregateType(std::string name, std::vector<std::pair<std::string, std::string>>& elements, TypeManager& manager);
 
     llvm::Value* llvm_init_value(llvm::LLVMContext& context) override;
     llvm::Type* llvm_type(llvm::LLVMContext& context) override;
@@ -166,7 +161,6 @@ struct ErrorType: public LogicalType {
     uint64_t llvm_memory_size(llvm::Module& _module) override {assert(false && "any type have no memory size");};
 }; 
 
-std::shared_ptr<TypeBase> find_type_by_name(std::string&& name, std::unordered_map<std::string, TypeSystem::AggregateType>& struct_table_);
 bool is_same_type(TypeBase* a, TypeBase* b);
 bool is_same_type(std::string& str, TypeBase* t);
 bool is_same_type(std::string& str, std::string& name);

@@ -87,7 +87,7 @@ uint64_t ArrayType::llvm_memory_size(llvm::Module& _module) {
     return length * element_type->llvm_memory_size(_module);
 }
 
-AggregateType::AggregateType(
+/* AggregateType::AggregateType(
     std::string name,
     std::vector<std::pair<std::string, std::string>>& _elements,
     std::unordered_map<std::string, TypeSystem::AggregateType>& struct_table)
@@ -106,13 +106,13 @@ AggregateType::AggregateType(
         index_type_hash_.insert({index, type_ptr.get()});
     }
 }
-
-AggregateType::AggregateType(std::string name, std::vector<std::pair<std::string, std::string>>& _elements, TypeManager& manager)
+ */
+AggregateType::AggregateType(std::string name, std::vector<std::pair<std::string, std::string>>& elements, TypeManager& manager)
     : name_(std::move(name)) {
     int posi = 0;
-    for (auto& [_name, type_str]: elements_) {
+    for (auto& [_name, type_str]: elements) {
         auto type = manager.find_type_by_name(type_str);
-        index_with_types_.emplace_back(posi, std::move(type));
+        index_with_types_.emplace_back(posi, type);
         position_name_.insert({posi, _name});
         name_position_.insert({_name, posi});
         posi++;
@@ -167,7 +167,7 @@ TypeBase* AggregateType::element_type(std::string& element) {
     return name_type_hash_[element];
 }
 
-std::shared_ptr<TypeBase> find_type_by_name(std::string&& name, std::unordered_map<std::string, TypeSystem::AggregateType>& struct_table_) {
+/* std::shared_ptr<TypeBase> find_type_by_name(std::string&& name, std::unordered_map<std::string, TypeSystem::AggregateType>& struct_table_) {
     if (name == "double") {
         return std::make_shared<DoubleType>();
     } else if (name == "i32") {
@@ -189,7 +189,7 @@ std::shared_ptr<TypeBase> find_type_by_name(std::string&& name, std::unordered_m
 
     std::cout << "type name is: " << name << std::endl;
     assert(false && "Unknown type name");
-}
+} */
 
 bool is_same_type(TypeBase* a, TypeBase* b) {
     if (!a) {
@@ -254,12 +254,12 @@ TypeManager::TypeManager() {
 
 std::shared_ptr<TypeSystem::TypeBase> TypeManager::find_type_by_name(std::string& name) {
     if (type_table_.count(name)) {
-        return type_table_[name];
+        return type_table_[name]->shared_from_this();
     } else if (name.starts_with("array")) {
         auto [element_name, array_size] = TypeSystem::extract_nesting_type(name);
         auto type_ptr = find_type_by_name(element_name);
         type_table_.insert({name, std::make_shared<TypeSystem::ArrayType>(array_size, std::move(type_ptr))});
-        return type_table_[name];        
+        return type_table_[name]->shared_from_this();        
     } else {
         std::cout << "type name is: " << name << std::endl;
         assert(false && "Unknown type name");        

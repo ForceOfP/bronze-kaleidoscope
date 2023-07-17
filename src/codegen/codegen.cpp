@@ -144,7 +144,7 @@ llvm::Value* CodeGenerator::codegen(std::unique_ptr<ArrayExpr> e) {
         values.push_back(static_cast<llvm::Constant*>(element_value));
         cnt++;
     }
-    auto array_type = TypeSystem::find_type_by_name(std::move(e->type), struct_table_);
+    auto array_type = type_manager_.find_type_by_name(e->type);
     auto ans = array_type->get_llvm_value(*context_, std::any(values));
     if (!ans) {
         err_ = "Generate ConstantArray error";
@@ -174,7 +174,7 @@ llvm::Value* CodeGenerator::codegen(std::unique_ptr<VarDeclareExpr> e) {
     symbol_table_.step();
 
     auto& var_name = e->name;
-    auto var_type = TypeSystem::find_type_by_name(std::move(e->type), struct_table_);
+    auto var_type = type_manager_.find_type_by_name(e->type);
     auto init = std::move(e->value);
 
     llvm::Value* init_value = nullptr;
@@ -476,7 +476,7 @@ llvm::Value* CodeGenerator::codegen(std::unique_ptr<BinaryExpr> e) {
                         element_or_offsets.emplace_back(std::get<std::string>(addr));
                     }
                 }
-                if (!symbol_table_.store(builder_.get(), lhse->name, rhs_value, element_or_offsets, struct_table_)) {
+                if (!symbol_table_.store(builder_.get(), lhse->name, rhs_value, element_or_offsets, type_manager_)) {
                     err_ = "SymbolTable store " + lhse->name + "failed.";
                     return nullptr;
                 } 
@@ -556,9 +556,11 @@ llvm::Value* CodeGenerator::codegen(std::unique_ptr<VariableExpr> e) {
                         target_llvm_type = static_cast<llvm::ArrayType*>(target_llvm_type)->getArrayElementType();
                         target_front_end_type_str = TypeSystem::extract_nesting_type(target_front_end_type_str).first;
                     } else {
-                        auto& target_front_end_type = struct_table_.at(target_front_end_type_str);
+                        // auto& target_front_end_type = struct_table_.at(target_front_end_type_str);
+                        auto target_front_end_type = type_manager_.find_type_by_name(target_front_end_type_str);
+                        auto target_front_end_type_raw = static_cast<TypeSystem::AggregateType*>(target_front_end_type.get());
                         auto& taked_element_name = std::get<std::string>(addr);
-                        unsigned int index = target_front_end_type.element_position(taked_element_name);
+                        unsigned int index = target_front_end_type_raw->element_position(taked_element_name);
 
                         offset_values.push_back(llvm::ConstantInt::get(*context_, llvm::APInt(32, index)));
                         target_ptr = builder_->CreateInBoundsGEP(target_llvm_type, ret, offset_values, "offset");
@@ -576,8 +578,8 @@ llvm::Value* CodeGenerator::codegen(std::unique_ptr<VariableExpr> e) {
 }
 
 llvm::Value* CodeGenerator::codegen(std::unique_ptr<LiteralExpr> e) {
-    auto tmp = e->type;
-    auto literal_type = TypeSystem::find_type_by_name(std::move(tmp), struct_table_);
+    auto& tmp = e->type;
+    auto literal_type = type_manager_.find_type_by_name(tmp);
     return literal_type->get_llvm_value(*context_, e->value);
 }
 
@@ -667,10 +669,10 @@ llvm::Function* CodeGenerator::codegen(ProtoTypePtr p) {
 
     std::vector<llvm::Type*> arg_types;
     for (auto& arg: p->args) {
-        auto arg_type = TypeSystem::find_type_by_name(std::move(arg.second), struct_table_);
+        auto arg_type = type_manager_.find_type_by_name(arg.second);
         arg_types.push_back(arg_type->llvm_type(*context_));
     }
-    auto answer_type = TypeSystem::find_type_by_name(std::move(p->answer), struct_table_);
+    auto answer_type = type_manager_.find_type_by_name(p->answer);
     llvm::Type* result_type = answer_type->llvm_type(*context_);
     llvm::FunctionType* function_type = llvm::FunctionType::get(result_type, arg_types, false);
     llvm::Function* function = llvm::Function::Create(
@@ -773,7 +775,6 @@ void CodeGenerator::codegen(std::vector<ASTNodePtr>&& ast_tree) {
             },
             [&](StructNode& s) {
                 type_manager_.add_type(s.name, s.elements);
-                struct_table_.insert({s.name, TypeSystem::AggregateType(s.name, s.elements, struct_table_)});
                 output_stream_ << "parsed struct definition.\n";
             }
         );

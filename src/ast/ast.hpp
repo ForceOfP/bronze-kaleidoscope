@@ -22,7 +22,6 @@ using ExpressionPtr = std::unique_ptr<Expression>;
 struct ArrayExpr: public Expression {
     std::vector<ExpressionPtr> elements;
     std::string type;
-    //TypeSystem::TypeEnum type;
     ArrayExpr(std::vector<ExpressionPtr> _elements, std::string _type): elements(std::move(_elements)), type(std::move(_type)) {}
     std::string& expression_name() override {static std::string name = "[Array]"; return name;}
 };
@@ -34,8 +33,6 @@ struct Body {
         data(std::move(body)), has_return_value(_has_return_value) {}
     Body() = default;
 };
-
-// using Body = std::vector<ExpressionPtr>;
 
 struct LiteralExpr: public Expression {
     double value;
@@ -51,10 +48,7 @@ struct VariableExpr: public Expression {
 
     using Addr = std::variant<std::string, ExpressionPtr>;
     std::vector<Addr> addrs;    
-    // std::vector<ExpressionPtr> offset_indexes;
     explicit VariableExpr(std::string str): name(std::move(str)) {}
-    // VariableExpr(std::string str, std::vector<ExpressionPtr> offset_indexes):
-    //     name(std::move(str)), offset_indexes(std::move(offset_indexes)) {}
 
     VariableExpr(
         std::string str, 
@@ -111,7 +105,6 @@ struct ForExpr: public Expression {
 struct UnaryExpr: public Expression {
     std::string _operater;
     ExpressionPtr operand;
-    // std::vector<ExpressionPtr> offset_indexes;
 
     UnaryExpr(std::string oper, ExpressionPtr opnd):
         _operater(std::move(oper)), operand(std::move(opnd)) {}
@@ -120,7 +113,6 @@ struct UnaryExpr: public Expression {
 };
 
 struct VarDeclareExpr: public Expression {    
-    //TypeSystem::TypeEnum type;
     std::string type;
     std::string name;
     ExpressionPtr value;
@@ -182,7 +174,6 @@ struct ExternNode {
 
 struct FunctionNode {
     std::unique_ptr<ProtoType> prototype;
-    // std::unique_ptr<Expression> body;
     Body body;
 
     FunctionNode(std::unique_ptr<ProtoType> _prototype, Body _body):

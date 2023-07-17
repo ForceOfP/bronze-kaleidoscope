@@ -74,12 +74,12 @@ bool SymbolTable::store(llvm::IRBuilder<>* builder, const std::string& name, llv
     return false;    
 }
 
-bool SymbolTable::store(llvm::IRBuilder<>* builder, const std::string& name, llvm::Value* target, std::vector<ElementOrOffset> addrs, std::unordered_map<std::string, TypeSystem::AggregateType>& struct_table_) {
+bool SymbolTable::store(llvm::IRBuilder<>* builder, const std::string& name, llvm::Value* target, std::vector<ElementOrOffset> addrs, TypeManager& type_manager) {
     auto c_iter = constant_scoped_blocks_.rbegin();
     for (auto iter = variant_scoped_blocks_.rbegin(); iter != variant_scoped_blocks_.rend(); iter++, c_iter++) {
         if (iter->count(name)) {
-            auto [alloca, type] = (*iter)[name];
-            auto front_end_type = TypeSystem::find_type_by_name(std::move(type), struct_table_);
+            auto& [alloca, type] = (*iter)[name];
+            auto front_end_type = type_manager.find_type_by_name(type);
             auto front_end_type_raw = front_end_type.get();
 
             llvm::Value* ptr = nullptr;

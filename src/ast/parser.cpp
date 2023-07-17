@@ -1,7 +1,6 @@
 #include "parser.hpp"
 #include "ast/ast.hpp"
 #include "ast/token.hpp"
-// #include "ast/type.hpp"
 
 #include <algorithm>
 #include <cassert>
@@ -661,22 +660,8 @@ ExpressionPtr Parser::parse_identifier_expr() {
                     return nullptr;
                 }                
             }
-            // next_token(); // eat '['
-            // auto index = parse_unary();
-            // if (!index) {
-            //     err_ = "need value in []";
-            //     return nullptr;
-            // }
-            // offset_indexes.push_back(std::move(index));
-            // if (current_token_type() == TokenType::RightSquareBrackets) {
-            //     next_token(); // eat ']'
-            // } else {
-            //     err_ = "expect ']' before '['";
-            //     return nullptr;
-            // }
         }
         return std::make_unique<VariableExpr>(name, std::move(addrs), all_array); 
-        //return std::make_unique<VariableExpr>(name, std::move(offset_indexes)); 
     }
 
     if (current_token_type() == TokenType::LeftParenthesis) {

@@ -21,7 +21,7 @@ void codegen_helper(std::vector<std::string>& target, std::vector<std::string>& 
         .function_pass_optimize = true,
     };
     auto generator = JitCodeGenerator(output, setting);
-    TypeChecker checker(generator.struct_table_, generator.type_manager_);
+    TypeChecker checker(generator.type_manager_);
 
     for (int i = 0; i < target.size(); i++) {
         auto parser = Parser(Lexer::tokenize(target[i]), generator.binary_oper_precedence_);

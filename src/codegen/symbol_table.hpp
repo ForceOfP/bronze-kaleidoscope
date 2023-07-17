@@ -23,7 +23,12 @@ public:
     bool store(llvm::IRBuilder<>* builder, const std::string& name, llvm::Value* target, std::vector<llvm::Value*> offsets);
 
     using ElementOrOffset = std::variant<std::string, llvm::Value*>;
-    bool store(llvm::IRBuilder<>* builder, const std::string& name, llvm::Value* target, std::vector<ElementOrOffset> addrs, std::unordered_map<std::string, TypeSystem::AggregateType>& struct_table_);
+    bool store(
+        llvm::IRBuilder<>* builder, 
+        const std::string& name, 
+        llvm::Value* target, 
+        std::vector<ElementOrOffset> addrs, 
+        TypeManager& type_manager);
     std::string& find_symbol_type_str(std::string& symbol_name);
 private:
     std::vector<std::unordered_map<std::string, std::pair<llvm::AllocaInst*, std::string>>> variant_scoped_blocks_;

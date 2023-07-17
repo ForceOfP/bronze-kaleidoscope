@@ -40,7 +40,6 @@ std::vector<Token> Lexer::tokenize(std::string target_) {
         if (!token_regex.Match(target, start, target.size(), RE2::ANCHOR_START,
                                 matched_tokens.data(), matched_tokens.size())) {
             std::cerr << "Failed to lex input at dis: " << start << std::endl;
-            //break;
             return {};
         } 
 

@@ -315,8 +315,9 @@ bool TypeChecker::check(VariableExpr* expr, std::string& type) {
                 _type = TypeSystem::extract_nesting_type(_type).first;
             } else {
                 auto& taked_element = std::get<std::string>(addr);
-                auto& struct_type = struct_table_.at(_type);
-                _type = struct_type.element_type(taked_element)->name();
+                auto struct_type = type_manager_.find_type_by_name(_type);
+                auto struct_type_raw = static_cast<TypeSystem::AggregateType*>(struct_type.get());
+                _type = struct_type_raw->element_type(taked_element)->name();
             }
         }
     }
@@ -354,20 +355,12 @@ bool TypeChecker::check(BinaryExpr* expr, std::string& type) {
                         let_all_literal_typed(taked_offset.get(), my_int32);
                         _type = TypeSystem::extract_nesting_type(_type).first;
                     } else {
-                        auto& taked_element = std::get<std::string>(addr);
-                        TypeSystem::AggregateType& struct_type = struct_table_.at(_type);
-                        _type = struct_type.element_type(taked_element)->name();                        
+                        auto& taked_element = std::get<std::string>(addr);                        
+                        auto struct_type = type_manager_.find_type_by_name(_type);
+                        auto struct_type_raw = static_cast<TypeSystem::AggregateType*>(struct_type.get());
+                        _type = struct_type_raw->element_type(taked_element)->name();                       
                     }
                 }
-                // if (variable->is_array_offset) {
-                //     for (auto& offset: variable->addrs) {
-                //         auto& taked_offset = std::get<ExpressionPtr>(offset);
-                //         let_all_literal_typed(taked_offset.get(), my_int32);
-                //     }
-                //     for (int i = 0; i < variable->addrs.size(); i++) {
-                //         type = TypeSystem::extract_nesting_type(type).first;
-                //     }
-                // }
             }
         }
 
