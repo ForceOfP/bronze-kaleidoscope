@@ -87,18 +87,30 @@ uint64_t ArrayType::llvm_memory_size(llvm::Module& _module) {
     return length * element_type->llvm_memory_size(_module);
 }
 
-AggregateType::AggregateType(std::string name, std::vector<std::pair<std::string, std::string>>& _elements)
-    : name_(std::move(name)) {
-    for (auto& [name, type_str]: _elements) {
-        auto type = find_type_by_name(std::move(type_str));
-        name_with_types_.emplace_back(name, std::move(type));
+AggregateType::AggregateType(
+    std::string name,
+    std::vector<std::pair<std::string, std::string>>& _elements,
+    std::unordered_map<std::string, TypeSystem::AggregateType>& struct_table)
+    : name_(std::move(name)), elements_(_elements) {
+    int posi = 0;
+    for (auto& [_name, type_str]: elements_) {
+        auto type = find_type_by_name(std::move(type_str), struct_table);
+        index_with_types_.emplace_back(posi, std::move(type));
+        position_name_.insert({posi, _name});
+        name_position_.insert({_name, posi});
+        posi++;
+    }
+
+    for (auto& [index, type_ptr]: index_with_types_) {
+        name_type_hash_.insert({position_name_[index], type_ptr.get()});
+        index_type_hash_.insert({index, type_ptr.get()});
     }
 }
 
 llvm::Value* AggregateType::llvm_init_value(llvm::LLVMContext& context) {
     std::vector<llvm::Constant*> values;
-    values.reserve(name_with_types_.size());
-    for (auto& [_, type]: name_with_types_) {
+    values.reserve(index_with_types_.size());
+    for (auto& [_, type]: index_with_types_) {
         values.push_back(static_cast<llvm::Constant*>(type->llvm_init_value(context)));
     }    
     llvm::Type* struct_type = llvm_type(context);
@@ -108,8 +120,8 @@ llvm::Value* AggregateType::llvm_init_value(llvm::LLVMContext& context) {
 
 llvm::Type* AggregateType::llvm_type(llvm::LLVMContext& context) {
     std::vector<llvm::Type*> types;
-    types.reserve(name_with_types_.size());
-    for (auto& [_, type]: name_with_types_) {
+    types.reserve(index_with_types_.size());
+    for (auto& [_, type]: index_with_types_) {
         types.push_back(type->llvm_type(context));
     }
     return llvm::StructType::create(context, types, name_);
@@ -124,13 +136,21 @@ llvm::Value* AggregateType::get_llvm_value(llvm::LLVMContext& context, std::any 
 
 uint64_t AggregateType::llvm_memory_size(llvm::Module& _module) {
     uint64_t len = 0;
-    for (auto& [_, type]: name_with_types_) {
+    for (auto& [_, type]: index_with_types_) {
         len += type->llvm_memory_size(_module);
     }
     return len;
 }
 
-std::unique_ptr<TypeBase> find_type_by_name(std::string&& name) {
+unsigned int AggregateType::element_position(std::string& element) {
+    return name_position_[element];
+}
+
+TypeBase* AggregateType::element_type(std::string& element) {
+    return name_type_hash_[element];
+}
+
+std::unique_ptr<TypeBase> find_type_by_name(std::string&& name, std::unordered_map<std::string, TypeSystem::AggregateType>& struct_table_) {
     if (name == "double") {
         return std::make_unique<DoubleType>();
     } else if (name == "i32") {
@@ -143,8 +163,11 @@ std::unique_ptr<TypeBase> find_type_by_name(std::string&& name) {
         return std::make_unique<ErrorType>();
     } else if (name.starts_with("array")) {
         auto [element_name, array_size] = extract_nesting_type(name);
-        auto type_ptr = find_type_by_name(std::move(element_name));
+        auto type_ptr = find_type_by_name(std::move(element_name), struct_table_);
         return std::make_unique<ArrayType>(array_size, std::move(type_ptr));
+    } else if (struct_table_.count(name)) {
+        auto& struct_type = struct_table_.at(name);
+        return std::make_unique<AggregateType>(struct_type.name_, struct_type.elements_, struct_table_);
     }
 
     std::cout << "type name is: " << name << std::endl;

@@ -2,6 +2,8 @@
 
 #include <cstdint>
 #include <iostream>
+#include <llvm-15/llvm/IR/DerivedTypes.h>
+#include <llvm-15/llvm/IR/Value.h>
 #include <llvm/ADT/Optional.h>
 #include <llvm/Support/CodeGen.h>
 #include <llvm/Support/FileSystem.h>
@@ -34,10 +36,12 @@
 #include <system_error>
 #include <unistd.h>
 #include <utility>
+#include <variant>
 #include <vector>
 #include <cassert>
 
 #include "ast/type.hpp"
+#include "codegen/symbol_table.hpp"
 #include "extern.hpp"
 #include "ast/ast.hpp"
 #include "codegen/jit_engine.hpp"
@@ -140,7 +144,7 @@ llvm::Value* CodeGenerator::codegen(std::unique_ptr<ArrayExpr> e) {
         values.push_back(static_cast<llvm::Constant*>(element_value));
         cnt++;
     }
-    auto array_type = TypeSystem::find_type_by_name(std::move(e->type));
+    auto array_type = TypeSystem::find_type_by_name(std::move(e->type), struct_table_);
     auto ans = array_type->get_llvm_value(*context_, std::any(values));
     if (!ans) {
         err_ = "Generate ConstantArray error";
@@ -170,7 +174,7 @@ llvm::Value* CodeGenerator::codegen(std::unique_ptr<VarDeclareExpr> e) {
     symbol_table_.step();
 
     auto& var_name = e->name;
-    auto var_type = TypeSystem::find_type_by_name(std::move(e->type));
+    auto var_type = TypeSystem::find_type_by_name(std::move(e->type), struct_table_);
     auto init = std::move(e->value);
 
     llvm::Value* init_value = nullptr;
@@ -213,10 +217,15 @@ llvm::Value* CodeGenerator::codegen(std::unique_ptr<VarDeclareExpr> e) {
             );
 
             symbol_table_.add_variant(var_name, alloca, var_type->name());
-        } else {
+        } else if (var_type->is_primitive()) {
             alloca = create_entry_block_alloca(function, var_name, var_type.get());
             builder_->CreateStore(init_value, alloca);
             symbol_table_.add_variant(var_name, alloca);
+        } else if (var_type->is_aggregate()) {
+            auto struct_type = static_cast<TypeSystem::AggregateType*>(var_type.get());
+            alloca = create_entry_block_alloca(function, var_name, struct_type);
+
+            symbol_table_.add_variant(var_name, alloca, var_type->name());            
         }
     }
 
@@ -436,19 +445,41 @@ llvm::Value* CodeGenerator::codegen(std::unique_ptr<BinaryExpr> e) {
             return nullptr;
         }
 
-        if (!lhse->offset_indexes.empty()) {
-            std::vector<llvm::Value*> offset_values {llvm::ConstantInt::get(*context_, llvm::APInt(32, 0))};
-            for (auto& index: lhse->offset_indexes) {
-                if (auto offset_value = codegen(std::move(index))) {
-                    offset_values.push_back(offset_value);
-                } else {
-                    return nullptr;
+        if (!lhse->addrs.empty()) { 
+            if (lhse->is_array_offset) {
+                std::vector<llvm::Value*> offset_values {llvm::ConstantInt::get(*context_, llvm::APInt(32, 0))};
+                for (auto& index: lhse->addrs) {
+                    auto& taked_index = std::get<ExpressionPtr>(index);
+                    if (auto offset_value = codegen(std::move(taked_index))) {
+                        offset_values.push_back(offset_value);
+                    } else {
+                        return nullptr;
+                    }
                 }
-            }
 
-            if (!symbol_table_.store(builder_.get(), lhse->name, rhs_value, offset_values)) {
-                err_ = "SymbolTable store " + lhse->name + "failed.";
-                return nullptr;
+                if (!symbol_table_.store(builder_.get(), lhse->name, rhs_value, offset_values)) {
+                    err_ = "SymbolTable store " + lhse->name + "failed.";
+                    return nullptr;
+                }                
+            } else {
+                std::vector<SymbolTable::ElementOrOffset> element_or_offsets;
+                int index = 0;
+                for (auto& addr: lhse->addrs) {
+                    if (std::holds_alternative<ExpressionPtr>(addr)) {
+                        auto& taked_index = std::get<ExpressionPtr>(addr);
+                        if (auto offset_value = codegen(std::move(taked_index))) {
+                            element_or_offsets.emplace_back(offset_value);
+                        } else {
+                            return nullptr;
+                        }                        
+                    } else {
+                        element_or_offsets.emplace_back(std::get<std::string>(addr));
+                    }
+                }
+                if (!symbol_table_.store(builder_.get(), lhse->name, rhs_value, element_or_offsets, struct_table_)) {
+                    err_ = "SymbolTable store " + lhse->name + "failed.";
+                    return nullptr;
+                } 
             }
         } else {
             if (!symbol_table_.store(builder_.get(), lhse->name, rhs_value)) {
@@ -490,24 +521,52 @@ llvm::Value* CodeGenerator::codegen(std::unique_ptr<BinaryExpr> e) {
 
 llvm::Value* CodeGenerator::codegen(std::unique_ptr<VariableExpr> e) {
     if (auto ret = symbol_table_.load(builder_.get(), e->name)) {
-        if (!e->offset_indexes.empty()) {
-            std::vector<llvm::Value*> offset_values {llvm::ConstantInt::get(*context_, llvm::APInt(32, 0))};
-            // std::vector<llvm::Value*> offset_values {};
-            
-            for (auto& offset: e->offset_indexes) {
-                auto offset_value = codegen(std::move(offset));
-                if (!offset_value) {
-                    return nullptr;
+        if (!e->addrs.empty()) {
+            if (e->is_array_offset) {
+                std::vector<llvm::Value*> offset_values {llvm::ConstantInt::get(*context_, llvm::APInt(32, 0))};
+                
+                for (auto& offset: e->addrs) {
+                    auto& taked_offset = std::get<ExpressionPtr>(offset);
+                    auto offset_value = codegen(std::move(taked_offset));
+                    if (!offset_value) {
+                        return nullptr;
+                    }
+                    offset_values.push_back(offset_value);
                 }
-                offset_values.push_back(offset_value);
+                auto target_type = static_cast<llvm::AllocaInst*>(ret)->getAllocatedType();
+                auto target_ptr = builder_->CreateInBoundsGEP(target_type, ret, offset_values, "offset");
+                for (int i = 0; i < offset_values.size() - 1; i++) {
+                    target_type = static_cast<llvm::ArrayType*>(target_type)->getArrayElementType();
+                }
+                ret = builder_->CreateLoad(target_type, target_ptr, "offsetValue");
+            } else {
+                auto target_llvm_type = static_cast<llvm::AllocaInst*>(ret)->getAllocatedType();
+                llvm::Value* target_ptr = nullptr;
+                auto target_front_end_type_str = symbol_table_.find_symbol_type_str(e->name);
+                for (auto& addr: e->addrs) {
+                    std::vector<llvm::Value*> offset_values {llvm::ConstantInt::get(*context_, llvm::APInt(32, 0))};
+                    if (std::holds_alternative<ExpressionPtr>(addr)) {
+                        auto taked_offset = std::move(std::get<ExpressionPtr>(addr));
+                        auto offset_value = codegen(std::move(taked_offset));
+                        if (!offset_value) {
+                            return nullptr;
+                        }
+                        offset_values.push_back(offset_value);
+                        target_ptr = builder_->CreateInBoundsGEP(target_llvm_type, ret, offset_values, "offset");
+                        target_llvm_type = static_cast<llvm::ArrayType*>(target_llvm_type)->getArrayElementType();
+                        target_front_end_type_str = TypeSystem::extract_nesting_type(target_front_end_type_str).first;
+                    } else {
+                        auto& target_front_end_type = struct_table_.at(target_front_end_type_str);
+                        auto& taked_element_name = std::get<std::string>(addr);
+                        unsigned int index = target_front_end_type.element_position(taked_element_name);
+
+                        offset_values.push_back(llvm::ConstantInt::get(*context_, llvm::APInt(32, index)));
+                        target_ptr = builder_->CreateInBoundsGEP(target_llvm_type, ret, offset_values, "offset");
+                        target_llvm_type = static_cast<llvm::StructType*>(target_llvm_type)->getStructElementType(index);
+                    }
+                }
+                ret = builder_->CreateLoad(target_llvm_type, target_ptr, "offsetValue");
             }
-            auto target_type = static_cast<llvm::AllocaInst*>(ret)->getAllocatedType();
-            auto target_ptr = builder_->CreateInBoundsGEP(target_type, ret, offset_values, "offset");
-            // for (int i = 0; i < offset_values.size(); i++) {
-            for (int i = 0; i < offset_values.size() - 1; i++) {
-                target_type = static_cast<llvm::ArrayType*>(target_type)->getArrayElementType();
-            }
-            ret = builder_->CreateLoad(target_type, target_ptr, "offsetValue");
         }
         return ret;
     }
@@ -518,7 +577,7 @@ llvm::Value* CodeGenerator::codegen(std::unique_ptr<VariableExpr> e) {
 
 llvm::Value* CodeGenerator::codegen(std::unique_ptr<LiteralExpr> e) {
     auto tmp = e->type;
-    auto literal_type = TypeSystem::find_type_by_name(std::move(tmp));
+    auto literal_type = TypeSystem::find_type_by_name(std::move(tmp), struct_table_);
     return literal_type->get_llvm_value(*context_, e->value);
 }
 
@@ -608,10 +667,10 @@ llvm::Function* CodeGenerator::codegen(ProtoTypePtr p) {
 
     std::vector<llvm::Type*> arg_types;
     for (auto& arg: p->args) {
-        auto arg_type = TypeSystem::find_type_by_name(std::move(arg.second));
+        auto arg_type = TypeSystem::find_type_by_name(std::move(arg.second), struct_table_);
         arg_types.push_back(arg_type->llvm_type(*context_));
     }
-    auto answer_type = TypeSystem::find_type_by_name(std::move(p->answer));
+    auto answer_type = TypeSystem::find_type_by_name(std::move(p->answer), struct_table_);
     llvm::Type* result_type = answer_type->llvm_type(*context_);
     llvm::FunctionType* function_type = llvm::FunctionType::get(result_type, arg_types, false);
     llvm::Function* function = llvm::Function::Create(
@@ -713,7 +772,8 @@ void CodeGenerator::codegen(std::vector<ASTNodePtr>&& ast_tree) {
                 }
             },
             [&](StructNode& s) {
-                struct_table_[s.name] = std::make_unique<TypeSystem::AggregateType>(s.name, s.elements);
+                //struct_table_[s.name] = std::make_unique<TypeSystem::AggregateType>(s.name, s.elements);
+                struct_table_.insert({s.name, TypeSystem::AggregateType(s.name, s.elements, struct_table_)});
             }
         );
     }
@@ -734,4 +794,3 @@ llvm::Function* CodeGenerator::get_function(std::string& name) {
     output_stream_ << "not find function!\n";
     return nullptr;
 }
-

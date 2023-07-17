@@ -48,12 +48,22 @@ struct LiteralExpr: public Expression {
 
 struct VariableExpr: public Expression {
     std::string name;
-    std::vector<ExpressionPtr> offset_indexes;
+
+    using Addr = std::variant<std::string, ExpressionPtr>;
+    std::vector<Addr> addrs;    
+    // std::vector<ExpressionPtr> offset_indexes;
     explicit VariableExpr(std::string str): name(std::move(str)) {}
-    VariableExpr(std::string str, std::vector<ExpressionPtr> offset_indexes):
-        name(std::move(str)), offset_indexes(std::move(offset_indexes)) {}
+    // VariableExpr(std::string str, std::vector<ExpressionPtr> offset_indexes):
+    //     name(std::move(str)), offset_indexes(std::move(offset_indexes)) {}
+
+    VariableExpr(
+        std::string str, 
+        std::vector<Addr> addresses, 
+        bool _is_array_offset):
+        name(std::move(str)), addrs(std::move(addresses)), is_array_offset(_is_array_offset) {}
 
     std::string& expression_name() override {static std::string name = "[Variable]"; return name;}
+    bool is_array_offset = true;
 };
 
 struct BinaryExpr: public Expression {

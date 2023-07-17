@@ -4,6 +4,7 @@
 #include <llvm/Transforms/Scalar.h>
 #include <llvm/Transforms/Scalar/GVN.h>
 #include <llvm/Transforms/Utils.h>
+#include <string>
 
 JitCodeGenerator::JitCodeGenerator(llvm::raw_ostream& os, CodeGeneratorSetting setting): CodeGenerator(os, setting, false) {
     exit_on_error_ = llvm::ExitOnError();
@@ -87,7 +88,8 @@ void JitCodeGenerator::codegen(std::vector<ASTNodePtr>&& ast_tree) {
                 }
             },
             [&](StructNode& s) {
-                struct_table_[s.name] = std::make_unique<TypeSystem::AggregateType>(s.name, s.elements);
+                struct_table_.insert({s.name, TypeSystem::AggregateType(s.name, s.elements, struct_table_)});
+                // struct_table_[s.name] = std::make_unique<TypeSystem::AggregateType>(s.name, s.elements);
             }
         );
     }
@@ -107,19 +109,40 @@ llvm::Value* JitCodeGenerator::codegen(std::unique_ptr<BinaryExpr> e) {
             return nullptr;
         }
 
-        if (!lhse->offset_indexes.empty()) {
-            std::vector<llvm::Value*> offset_values {llvm::ConstantInt::get(*context_, llvm::APInt(32, 0))};
-            for (auto& index: lhse->offset_indexes) {
-                if (auto offset_value = CodeGenerator::codegen(std::move(index))) {
-                    offset_values.push_back(offset_value);
-                } else {
+        if (!lhse->addrs.empty()) {
+            if (lhse->is_array_offset) {
+                std::vector<llvm::Value*> offset_values {llvm::ConstantInt::get(*context_, llvm::APInt(32, 0))};
+                for (auto& index: lhse->addrs) {
+                    auto& taked_index = std::get<ExpressionPtr>(index);
+                    if (auto offset_value = CodeGenerator::codegen(std::move(taked_index))) {
+                        offset_values.push_back(offset_value);
+                    } else {
+                        return nullptr;
+                    }
+                }
+
+                if (!symbol_table_.store(builder_.get(), lhse->name, rhs_value, offset_values)) {
+                    err_ = "SymbolTable store " + lhse->name + "failed.";
                     return nullptr;
                 }
-            }
-
-            if (!symbol_table_.store(builder_.get(), lhse->name, rhs_value, offset_values)) {
-                err_ = "SymbolTable store " + lhse->name + "failed.";
-                return nullptr;
+            } else {
+                std::vector<SymbolTable::ElementOrOffset> element_or_offsets;
+                for (auto& addr: lhse->addrs) {
+                    if (std::holds_alternative<ExpressionPtr>(addr)) {
+                        auto& taked_index = std::get<ExpressionPtr>(addr);
+                        if (auto offset_value = CodeGenerator::codegen(std::move(taked_index))) {
+                            element_or_offsets.emplace_back(offset_value);
+                        } else {
+                            return nullptr;
+                        }                        
+                    } else {
+                        element_or_offsets.emplace_back(std::get<std::string>(addr));
+                    }
+                }
+                if (!symbol_table_.store(builder_.get(), lhse->name, rhs_value, element_or_offsets, struct_table_)) {
+                    err_ = "SymbolTable store " + lhse->name + "failed.";
+                    return nullptr;
+                } 
             }
         } else {
             if (!symbol_table_.store(builder_.get(), lhse->name, rhs_value)) {

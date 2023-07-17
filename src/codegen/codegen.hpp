@@ -52,6 +52,7 @@ public:
 public:
     std::map<std::string, int> binary_oper_precedence_ = {
         {"=", 2}, {"<", 10}, {"+", 20}, {"-", 20}, {"*", 40}};
+    std::unordered_map<std::string, TypeSystem::AggregateType> struct_table_;
 
 protected:
     llvm::Function* get_function(std::string& name);
@@ -73,7 +74,6 @@ protected:
     CodeGeneratorSetting setting_;
     OperatorFunctionManager operator_function_manager_;
     SymbolTable symbol_table_;
-    std::unordered_map<std::string, std::unique_ptr<TypeSystem::AggregateType>> struct_table_;
 
     llvm::BasicBlock* return_block = nullptr;
     llvm::AllocaInst* ret_alloca = nullptr;

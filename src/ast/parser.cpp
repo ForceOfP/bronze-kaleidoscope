@@ -615,7 +615,8 @@ ExpressionPtr Parser::parse_unary() {
 
 /// identifierexpr ::= identifier '(' expression* ')'
 ///                ::= identifier
-///                ::= identifier '[' expression ']'
+///                ::= identifier [ '[' expression ']' ]*
+///                ::= identifier [ '.' expression]*
 /// expression in parenthesis are splited by ','
 ExpressionPtr Parser::parse_identifier_expr() {
     std::string name = (*token_iter_).get_string();
@@ -623,30 +624,59 @@ ExpressionPtr Parser::parse_identifier_expr() {
 
     // variable
     if (current_token_type() != TokenType::LeftParenthesis
-        && current_token_type() != TokenType::LeftSquareBrackets) {
+        && current_token_type() != TokenType::LeftSquareBrackets
+        && current_token_type() != TokenType::Dot) {
         return std::make_unique<VariableExpr>(name); 
     }
 
-    if (current_token_type() == TokenType::LeftSquareBrackets) {
+    if (current_token_type() == TokenType::LeftSquareBrackets || current_token_type() == TokenType::Dot) {
         // offset address
         std::vector<ExpressionPtr> offset_indexes {};
+        std::vector<VariableExpr::Addr> addrs {};
 
-        while (current_token_type() == TokenType::LeftSquareBrackets) {
-            next_token(); // eat '['
-            auto index = parse_unary();
-            if (!index) {
-                err_ = "need value in []";
-                return nullptr;
-            }
-            offset_indexes.push_back(std::move(index));
-            if (current_token_type() == TokenType::RightSquareBrackets) {
-                next_token(); // eat ']'
+        bool all_array = true;
+        while (current_token_type() == TokenType::LeftSquareBrackets
+                || current_token_type() == TokenType::Dot) {
+            if (current_token_type() == TokenType::Dot) {
+                all_array = false;
+                next_token(); // eat '.'
+                if (current_token_type() != TokenType::Identifier) {
+                    err_ = "expect identifier before '.'";
+                    return nullptr;
+                } 
+                addrs.emplace_back(token_iter_->get_string());
+                next_token(); // eat Identifier             
             } else {
-                err_ = "expect ']' before '['";
-                return nullptr;
+                next_token(); // eat '['
+                auto index = parse_unary();
+                if (!index) {
+                    err_ = "need value in []";
+                    return nullptr;
+                }
+                addrs.emplace_back(std::move(index));
+                if (current_token_type() == TokenType::RightSquareBrackets) {
+                    next_token(); // eat ']'
+                } else {
+                    err_ = "expect ']' before '['";
+                    return nullptr;
+                }                
             }
+            // next_token(); // eat '['
+            // auto index = parse_unary();
+            // if (!index) {
+            //     err_ = "need value in []";
+            //     return nullptr;
+            // }
+            // offset_indexes.push_back(std::move(index));
+            // if (current_token_type() == TokenType::RightSquareBrackets) {
+            //     next_token(); // eat ']'
+            // } else {
+            //     err_ = "expect ']' before '['";
+            //     return nullptr;
+            // }
         }
-        return std::make_unique<VariableExpr>(name, std::move(offset_indexes)); 
+        return std::make_unique<VariableExpr>(name, std::move(addrs), all_array); 
+        //return std::make_unique<VariableExpr>(name, std::move(offset_indexes)); 
     }
 
     if (current_token_type() == TokenType::LeftParenthesis) {

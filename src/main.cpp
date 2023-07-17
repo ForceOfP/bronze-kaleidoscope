@@ -59,7 +59,7 @@ void driver(Stage stage) {
         generator = new JitCodeGenerator(llvm::errs(), setting);
     }
     //auto generator = CodeGenerator(llvm::errs(), stage != Stage::Target); 
-    TypeChecker checker;
+    TypeChecker checker(generator->struct_table_);
 
     for (;;) {
         cout << "ready> ";

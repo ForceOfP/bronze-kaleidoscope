@@ -21,7 +21,7 @@ void codegen_helper(std::vector<std::string>& target, std::vector<std::string>& 
         .function_pass_optimize = true,
     };
     auto generator = JitCodeGenerator(output, setting);
-    TypeChecker checker;
+    TypeChecker checker(generator.struct_table_);
 
     for (int i = 0; i < target.size(); i++) {
         auto parser = Parser(Lexer::tokenize(target[i]), generator.binary_oper_precedence_);
@@ -340,3 +340,6 @@ TEST(CODEGEN, arrayNested) {
     assert(target.size() == answer.size());
     codegen_helper(target, answer);
 }
+
+// struct Foo {a: double, b: double,};
+// def f() -> double {var x: Foo; x.a = 1.0; return x.a;}

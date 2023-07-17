@@ -29,6 +29,9 @@ private:
 
 class TypeChecker {
 public:
+    explicit TypeChecker(std::unordered_map<std::string, TypeSystem::AggregateType>& struct_table)
+        : struct_table_(struct_table) {}
+
     bool check(ASTNode& a);
     bool check(const Body& body, std::string& type);
     bool check(Expression* expr, std::string& type);
@@ -59,5 +62,7 @@ private:
     std::string result_type_;
 
     std::string my_int32 = "i32";
+
+    std::unordered_map<std::string, TypeSystem::AggregateType>& struct_table_;
 };
 

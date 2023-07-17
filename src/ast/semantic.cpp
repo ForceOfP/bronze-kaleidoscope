@@ -1,10 +1,12 @@
 #include "semantic.hpp"
 #include "ast/ast.hpp"
 #include "ast/type.hpp"
+#include <cassert>
 #include <cstdlib>
 #include <iostream>
 #include <memory>
 #include <string>
+#include <variant>
 #include <vector>
 
 namespace Semantic {
@@ -307,9 +309,15 @@ bool TypeChecker::check(LiteralExpr* expr, std::string& type) {
 bool TypeChecker::check(VariableExpr* expr, std::string& type) {
     auto _type = symbol_table_.find_symbol_type(expr->name);
 
-    if (!expr->offset_indexes.empty()) {
-        for (int i = 0; i < expr->offset_indexes.size(); i++) {
-            _type = TypeSystem::extract_nesting_type(_type).first;
+    if (!expr->addrs.empty()) {
+        for (auto& addr: expr->addrs) {
+            if (std::holds_alternative<ExpressionPtr>(addr)) {
+                _type = TypeSystem::extract_nesting_type(_type).first;
+            } else {
+                auto& taked_element = std::get<std::string>(addr);
+                auto& struct_type = struct_table_.at(_type);
+                _type = struct_type.element_type(taked_element)->name();
+            }
         }
     }
 
@@ -331,20 +339,35 @@ bool TypeChecker::check(VariableExpr* expr, std::string& type) {
 
 bool TypeChecker::check(BinaryExpr* expr, std::string& type) {
     if (expr->oper == "=") {
+        auto _type = type;
         auto lhs = expr->lhs.get();
         auto variable = static_cast<VariableExpr*>(lhs);
         if (!variable) {
             err_ += "lhs should be variable;";
             return false;
         } else {
-            type = symbol_table_.find_symbol_type(variable->name);
-            if (!variable->offset_indexes.empty()) {
-                for (auto& offset: variable->offset_indexes) {
-                    let_all_literal_typed(offset.get(), my_int32);
+            _type = symbol_table_.find_symbol_type(variable->name);
+            if (!variable->addrs.empty()) {
+                for (auto& addr: variable->addrs) {
+                    if (std::holds_alternative<ExpressionPtr>(addr)) {
+                        auto& taked_offset = std::get<ExpressionPtr>(addr);
+                        let_all_literal_typed(taked_offset.get(), my_int32);
+                        _type = TypeSystem::extract_nesting_type(_type).first;
+                    } else {
+                        auto& taked_element = std::get<std::string>(addr);
+                        TypeSystem::AggregateType& struct_type = struct_table_.at(_type);
+                        _type = struct_type.element_type(taked_element)->name();                        
+                    }
                 }
-                for (int i = 0; i < variable->offset_indexes.size(); i++) {
-                    type = TypeSystem::extract_nesting_type(type).first;
-                }
+                // if (variable->is_array_offset) {
+                //     for (auto& offset: variable->addrs) {
+                //         auto& taked_offset = std::get<ExpressionPtr>(offset);
+                //         let_all_literal_typed(taked_offset.get(), my_int32);
+                //     }
+                //     for (int i = 0; i < variable->addrs.size(); i++) {
+                //         type = TypeSystem::extract_nesting_type(type).first;
+                //     }
+                // }
             }
         }
 
@@ -352,8 +375,8 @@ bool TypeChecker::check(BinaryExpr* expr, std::string& type) {
             err_ += "no rhs;";
             return false;
         }
-        if (check(expr->rhs.get(), type)) {
-            let_all_literal_typed(expr->rhs.get(), type);
+        if (check(expr->rhs.get(), _type)) {
+            let_all_literal_typed(expr->rhs.get(), _type);
             return true;
         }
         return false;
@@ -557,11 +580,13 @@ void TypeChecker::let_all_literal_typed(Expression* expr, std::string& type) {
 
     auto v = dynamic_cast<VariableExpr*>(expr);
     if (v) {
-        if (!v->offset_indexes.empty()) {
-            for (auto& offset: v->offset_indexes) {
-                let_all_literal_typed(offset.get(), my_int32);
+        if (!v->addrs.empty()) {
+            for (auto& offset: v->addrs) {
+                if (std::holds_alternative<ExpressionPtr>(offset)) {
+                    auto& taked_offset = std::get<ExpressionPtr>(offset);
+                    let_all_literal_typed(taked_offset.get(), my_int32);
+                }
             }
-            
         }
     }
 

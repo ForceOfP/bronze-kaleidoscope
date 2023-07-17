@@ -10,6 +10,7 @@
 #include <llvm/IR/Constant.h>
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -42,16 +43,29 @@ struct AggregateType: public TypeBase {
     bool is_aggregate() final {return true;}
     bool is_data_structure() final {return false;}
 
-    AggregateType(std::string name, std::vector<std::pair<std::string, std::string>>& _elements);
+    AggregateType(
+        std::string name, 
+        std::vector<std::pair<std::string, std::string>>& _elements,
+        std::unordered_map<std::string, TypeSystem::AggregateType>& struct_table);
     llvm::Value* llvm_init_value(llvm::LLVMContext& context) override;
     llvm::Type* llvm_type(llvm::LLVMContext& context) override;
     llvm::Value* get_llvm_value(llvm::LLVMContext& context, std::any value) override;    
     uint64_t llvm_memory_size(llvm::Module& _module) override;
     
     std::string name() override {return name_;}
-private:
-    std::vector<std::pair<std::string, std::unique_ptr<TypeBase>>> name_with_types_{};
+    unsigned int element_position(std::string& element);
+    TypeBase* element_type(unsigned int index);
+    TypeBase* element_type(std::string& element);
+
     std::string name_;
+    std::vector<std::pair<std::string, std::string>> elements_;
+private:
+    std::vector<std::pair<unsigned int, std::unique_ptr<TypeBase>>> index_with_types_{};
+    std::unordered_map<unsigned int, std::string> position_name_{};
+    std::unordered_map<std::string, unsigned int> name_position_{};
+    std::unordered_map<std::string, TypeBase*> name_type_hash_{};
+    std::unordered_map<unsigned int, TypeBase*> index_type_hash_{};
+
 };
 
 struct DataStructureType: public TypeBase {
@@ -147,7 +161,7 @@ struct ErrorType: public LogicalType {
     uint64_t llvm_memory_size(llvm::Module& _module) override {assert(false && "any type have no memory size");};
 }; 
 
-std::unique_ptr<TypeBase> find_type_by_name(std::string&& name);
+std::unique_ptr<TypeBase> find_type_by_name(std::string&& name, std::unordered_map<std::string, TypeSystem::AggregateType>& struct_table_);
 bool is_same_type(TypeBase* a, TypeBase* b);
 bool is_same_type(std::string& str, TypeBase* t);
 bool is_same_type(std::string& str, std::string& name);
